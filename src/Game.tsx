@@ -51,7 +51,7 @@ import { GameOverScreen } from './GameOverScreen.js';
 import { PipePair } from './PipePair.js';
 import { useDebugMode } from './useDebugMode.js';
 import type { DebugSnapshot } from './useDebugMode.js';
-import { useStressTest, SHADOW_X } from './useStressTest.js';
+import { useStressTest, SHADOW_X, SHADOW_BIRD_COUNT } from './useStressTest.js';
 
 const allBirdFrames = [
   [yellowBirdMid, yellowBirdDown, yellowBirdMid, yellowBirdUp],
@@ -116,16 +116,17 @@ export function Game() {
   // Stress test
   const {
     stressLevelRef,
-    sb0Ref, sb0ImgRef, sb1Ref, sb1ImgRef,
-    sb2Ref, sb2ImgRef, sb3Ref, sb3ImgRef,
-    sb4Ref, sb4ImgRef, sb5Ref, sb5ImgRef,
-    sb6Ref, sb6ImgRef, sb7Ref, sb7ImgRef,
+    shadowRefs, shadowImgRefs,
+    stressBtnRef, stressBtnTextRef,
     showShadowBirds,
     updateShadowBirds,
     applyPipeColorCycling,
     resetPipeColors,
+    cycleStressLevel,
     sendStressSnapshot,
   } = useStressTest();
+  // Double-fire guard for stress button (same pattern as main touch area)
+  const stressBtnPressedRef = useMainThreadRef(false);
 
   // Once a real touch event is observed, ignore all mouse events (synthesized).
   // This self-adapts: mobile sets it on first tap, desktop never sets it.
@@ -271,6 +272,9 @@ export function Game() {
     if (btsMtsLedRef.current) {
       btsMtsLedRef.current.setStyleProperty('bottom', `${gH + 6}px`);
     }
+    if (stressBtnRef.current) {
+      stressBtnRef.current.setStyleProperty('bottom', `${gH + 18}px`);
+    }
 
     // Update debug boundary lines
     updateBoundaryLines(layout.playHeight, PIPE_GAP);
@@ -348,31 +352,28 @@ export function Game() {
 
   function toggleDebugMode(): void {
     'main thread';
-    // Cycle: OFF → L0 (debug ON) → L1 → L2 → L3 → OFF
-    if (!debugModeRef.current) {
-      // OFF → L0: enable debug mode
-      debugModeRef.current = true;
-      stressLevelRef.current = 0;
+    debugModeRef.current = !debugModeRef.current;
+    if (debugModeRef.current) {
+      // Force lynxbird in debug mode
       birdVariantRef.current = 3;
       applyBirdScale();
       updateBirdSprite();
-    } else if (stressLevelRef.current === 0) {
-      // L0 → L1: element flood — show shadow birds
-      stressLevelRef.current = 1;
-      showShadowBirds(true);
-    } else if (stressLevelRef.current === 1) {
-      // L1 → L2: style mutation storm (per-frame pipe color cycling)
-      stressLevelRef.current = 2;
-    } else if (stressLevelRef.current === 2) {
-      // L2 → L3: cross-thread flood
-      stressLevelRef.current = 3;
     } else {
-      // L3 → OFF: disable everything
-      debugModeRef.current = false;
-      stressLevelRef.current = 0;
-      showShadowBirds(false);
-      resetPipeColors(getPipeTopRef, getPipeBotRef);
+      // Reset stress test when leaving debug mode
+      if (stressLevelRef.current > 0) {
+        stressLevelRef.current = 0;
+        showShadowBirds(false);
+        resetPipeColors(getPipeTopRef, getPipeBotRef);
+      }
+      if (stressBtnTextRef.current) {
+        stressBtnTextRef.current.setAttribute('text', 'L0');
+      }
+      // Re-randomize when leaving debug mode
       randomizeVariants();
+    }
+    // Show/hide stress button together with debug overlay
+    if (stressBtnRef.current) {
+      stressBtnRef.current.setStyleProperty('display', debugModeRef.current ? 'flex' : 'none');
     }
     applyDebugOverlay(birdRef);
     flashMtsToBts();
@@ -700,7 +701,19 @@ export function Game() {
     requestAnimationFrame(idleBob);
   }
 
-  // ===== Touch Handler (MTS) =====
+  // ===== Touch Handlers (MTS) =====
+
+  function onStressBtnDown(_e: MainThread.TouchEvent): void {
+    'main thread';
+    if (stressBtnPressedRef.current) return;
+    stressBtnPressedRef.current = true;
+    cycleStressLevel(getPipeTopRef, getPipeBotRef);
+  }
+
+  function onStressBtnUp(_e: MainThread.TouchEvent): void {
+    'main thread';
+    stressBtnPressedRef.current = false;
+  }
 
   function onTouchStart(_e: MainThread.TouchEvent): void {
     'main thread';
@@ -816,31 +829,21 @@ export function Game() {
           <image src={base} className="ground-img" />
         </view>
 
-        {/* Shadow birds (stress test L1+) */}
-        <view className="shadow-bird" main-thread:ref={sb0Ref} style={{ display: 'none', left: `${SHADOW_X[0]}px` }}>
-          <image src={yellowBirdMid} className="bird-img" main-thread:ref={sb0ImgRef} />
-        </view>
-        <view className="shadow-bird" main-thread:ref={sb1Ref} style={{ display: 'none', left: `${SHADOW_X[1]}px` }}>
-          <image src={yellowBirdMid} className="bird-img" main-thread:ref={sb1ImgRef} />
-        </view>
-        <view className="shadow-bird" main-thread:ref={sb2Ref} style={{ display: 'none', left: `${SHADOW_X[2]}px` }}>
-          <image src={blueBirdMid} className="bird-img" main-thread:ref={sb2ImgRef} />
-        </view>
-        <view className="shadow-bird" main-thread:ref={sb3Ref} style={{ display: 'none', left: `${SHADOW_X[3]}px` }}>
-          <image src={blueBirdMid} className="bird-img" main-thread:ref={sb3ImgRef} />
-        </view>
-        <view className="shadow-bird" main-thread:ref={sb4Ref} style={{ display: 'none', left: `${SHADOW_X[4]}px` }}>
-          <image src={redBirdMid} className="bird-img" main-thread:ref={sb4ImgRef} />
-        </view>
-        <view className="shadow-bird" main-thread:ref={sb5Ref} style={{ display: 'none', left: `${SHADOW_X[5]}px` }}>
-          <image src={redBirdMid} className="bird-img" main-thread:ref={sb5ImgRef} />
-        </view>
-        <view className="shadow-bird" main-thread:ref={sb6Ref} style={{ display: 'none', left: `${SHADOW_X[6]}px` }}>
-          <image src={lynxBirdMid} className="bird-img" main-thread:ref={sb6ImgRef} />
-        </view>
-        <view className="shadow-bird" main-thread:ref={sb7Ref} style={{ display: 'none', left: `${SHADOW_X[7]}px` }}>
-          <image src={lynxBirdMid} className="bird-img" main-thread:ref={sb7ImgRef} />
-        </view>
+        {/* Shadow birds (stress test L1+) — count driven by SHADOW_BIRD_COUNT */}
+        {Array.from({ length: SHADOW_BIRD_COUNT }, (_, i) => (
+          <view
+            key={`sb-${i}`}
+            className="shadow-bird"
+            main-thread:ref={shadowRefs[i]}
+            style={{ display: 'none', left: `${SHADOW_X[i]}px` }}
+          >
+            <image
+              src={allBirdFrames[Math.floor(i / 2) % 4]![0]!}
+              className="bird-img"
+              main-thread:ref={shadowImgRefs[i]}
+            />
+          </view>
+        ))}
 
         {/* Bird */}
         <view className="bird" main-thread:ref={birdRef}>
@@ -906,6 +909,20 @@ export function Game() {
             main-thread:bindmouseup={onTouchEnd as any}
           />
         )}
+
+        {/* Stress level button — visible in debug mode, sits on top of touch area */}
+        <view
+          className="stress-btn"
+          main-thread:ref={stressBtnRef}
+          style={{ display: 'none' }}
+          main-thread:bindtouchstart={onStressBtnDown}
+          main-thread:bindtouchend={onStressBtnUp}
+          main-thread:bindtouchcancel={onStressBtnUp}
+          main-thread:bindmousedown={onStressBtnDown as any}
+          main-thread:bindmouseup={onStressBtnUp as any}
+        >
+          <text className="stress-btn-text" main-thread:ref={stressBtnTextRef}>L0</text>
+        </view>
       </view>
     </view>
   );
