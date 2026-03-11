@@ -2,19 +2,20 @@ import { useMainThreadRef, useState } from '@lynx-js/react';
 import { runOnBackground } from '@lynx-js/react';
 import type { MainThread } from '@lynx-js/types';
 
-// ===== Configuration =====
-// Total shadow bird elements (all allocated upfront; higher levels show more)
-export const SHADOW_BIRD_COUNT = 400;
-// Per-level bird counts: L1-L3 → 32, L4 → 96, L5 → 200, L6 → 400 + double flood
-export const LEVEL_BIRD_COUNT = [0, 32, 32, 32, 96, 200, 400];
+// ===== Orthogonal Stress Dimensions =====
+// Freely composable for A/B performance analysis:
+//   Element count:  0 | 100 | 200 | 400  (shadow birds in the scene)
+//   Mutation level: basic (3 ops/bird) | heavy (+5 ops/bird = 8 total, ~167% increase)
+//   Thread flood:   0 | 10 | 50  (runOnBackground calls per frame with 4KB payload)
+export const BIRD_COUNT_OPTIONS = [100, 200, 400] as const;
+export const FLOOD_OPTIONS = [10, 50] as const;
 
-// L3+ cross-thread flood: N calls per frame, each with padded payload
-const FLOOD_CALLS_PER_FRAME = 10;
-const PAYLOAD_PAD = 'x'.repeat(1024); // 1KB padding per call
+// Max bird count — determines ref allocation and JSX element count
+export const SHADOW_BIRD_COUNT = Math.max(...BIRD_COUNT_OPTIONS);
 
-// Compute shadow bird X positions: evenly spaced across game width.
-// Overlap with main bird (x=60) is fine — shadows are translucent
-// and the real bird renders on top.
+const PAYLOAD_PAD = 'x'.repeat(4096); // 4KB padding per flood call
+
+// Compute shadow bird X positions: evenly spaced across game width
 function computeShadowPositions(count: number): number[] {
   const GAME_W = 288;
   const BIRD_W = 34;
@@ -29,10 +30,13 @@ function computeShadowPositions(count: number): number[] {
 export const SHADOW_X = computeShadowPositions(SHADOW_BIRD_COUNT);
 
 export function useStressTest() {
-  const stressLevelRef = useMainThreadRef(0);
-  const hueRef = useMainThreadRef(0);
+  // MTS config refs — set from BTS via runOnMainThread
+  const birdCountRef = useMainThreadRef(0);
+  const heavyRef = useMainThreadRef(0);   // 0 = basic, 1 = heavy mutations
+  const floodRef = useMainThreadRef(0);   // 0, 10, or 20
+  const tickRef = useMainThreadRef(0);
 
-  // BTS state for L3+ cross-thread flood target
+  // BTS state for cross-thread flood target
   const [, setStressPayload] = useState<unknown>(null);
 
   // Shadow bird refs — constant loop count ensures deterministic hook ordering
@@ -47,7 +51,7 @@ export function useStressTest() {
 
   // ===== MTS helpers (callee-before-caller order) =====
 
-  // Show/hide shadow birds — count-aware for L4 (all) vs L1-L3 (base)
+  // Show first `count` shadow birds, hide the rest
   function showShadowBirds(visible: boolean, count: number): void {
     'main thread';
     for (let i = 0; i < SHADOW_BIRD_COUNT; i++) {
@@ -55,15 +59,14 @@ export function useStressTest() {
       if (ref) {
         const show = visible && i < count;
         ref.setStyleProperty('display', show ? 'flex' : 'none');
-        // Reset opacity when showing (L2+ flicker may have changed it)
         if (show) ref.setStyleProperty('opacity', '0.5');
       }
     }
   }
 
-  // L1+: Update shadow birds to match main bird state
-  // L4 updates all SHADOW_BIRD_COUNT; L1-L3 update BASE_BIRD_COUNT
-  // L2+: extra opacity flicker per bird for more pressure
+  // Per-frame shadow bird updates — ops driven by config refs
+  // Basic: 3 ops/bird (top, transform, src)
+  // Heavy: 8 ops/bird (+opacity, width, height, backgroundColor, marginTop)
   function updateShadowBirds(
     birdY: number,
     rotation: number,
@@ -71,23 +74,29 @@ export function useStressTest() {
     allBirdFrames: string[][],
   ): void {
     'main thread';
-    if (stressLevelRef.current < 1) return;
-    const level = stressLevelRef.current;
-    const count = LEVEL_BIRD_COUNT[level] ?? SHADOW_BIRD_COUNT;
+    const count = birdCountRef.current;
+    if (count === 0) return;
+    const heavy = heavyRef.current;
+    tickRef.current++;
     for (let i = 0; i < count; i++) {
       const container = shadowRefs[i]?.current;
       const img = shadowImgRefs[i]?.current;
       if (container) {
         container.setStyleProperty('top', `${birdY}px`);
         container.setStyleProperty('transform', `rotate(${rotation}deg)`);
-        // L2+: per-bird opacity flicker — extra setStyleProperty per bird per frame
-        if (level >= 2) {
-          const flicker = 0.3 + 0.2 * Math.sin(hueRef.current * 0.1 + i);
-          container.setStyleProperty('opacity', `${flicker.toFixed(2)}`);
+        if (heavy) {
+          // +5 extra setStyleProperty calls per bird per frame (~167% more ops)
+          const t = tickRef.current * 0.1 + i;
+          const sin = Math.sin(t);
+          container.setStyleProperty('opacity', `${(0.3 + 0.2 * sin).toFixed(2)}`);
+          container.setStyleProperty('width', `${34 + Math.round(4 * sin)}px`);
+          container.setStyleProperty('height', `${24 + Math.round(3 * sin)}px`);
+          const hue = (tickRef.current * 3 + i * 37) % 360;
+          container.setStyleProperty('background-color', `hsl(${hue}, 80%, 50%)`);
+          container.setStyleProperty('margin-top', `${Math.round(2 * sin)}px`);
         }
       }
       if (img) {
-        // Each variant ×2, classic birds only (skip lynx — different size)
         const variant = Math.floor(i / 2) % 3;
         const frames = allBirdFrames[variant]!;
         img.setAttribute('src', frames[wingFrame]!);
@@ -95,85 +104,41 @@ export function useStressTest() {
     }
   }
 
-  // L2+: HSL color cycling on pipe backgrounds
-  function applyPipeColorCycling(
-    getPipeTopRef: (idx: number) => MainThread.Element | null,
-    getPipeBotRef: (idx: number) => MainThread.Element | null,
-    pipeCount: number,
-  ): void {
+  // Apply a full stress config — adjusts bird visibility
+  function applyStressConfig(birds: number, heavy: number, flood: number): void {
     'main thread';
-    if (stressLevelRef.current < 2) return;
-    hueRef.current = (hueRef.current + 3) % 360;
-    for (let i = 0; i < Math.min(pipeCount, 4); i++) {
-      const hue = (hueRef.current + i * 90) % 360;
-      const color = `hsl(${hue}, 80%, 50%)`;
-      const top = getPipeTopRef(i);
-      const bot = getPipeBotRef(i);
-      if (top) top.setStyleProperty('background-color', color);
-      if (bot) bot.setStyleProperty('background-color', color);
-    }
-  }
+    const prevBirds = birdCountRef.current;
+    birdCountRef.current = birds;
+    heavyRef.current = heavy;
+    floodRef.current = flood;
 
-  // Reset pipe colors (restore CSS defaults)
-  function resetPipeColors(
-    getPipeTopRef: (idx: number) => MainThread.Element | null,
-    getPipeBotRef: (idx: number) => MainThread.Element | null,
-  ): void {
-    'main thread';
-    for (let i = 0; i < 4; i++) {
-      const top = getPipeTopRef(i);
-      const bot = getPipeBotRef(i);
-      if (top) top.setStyleProperty('background-color', 'transparent');
-      if (bot) bot.setStyleProperty('background-color', 'transparent');
-    }
-  }
-
-  // Apply a new stress level — handles show/hide birds + reset pipes
-  function applyStressLevel(
-    newLevel: number,
-    getPipeTopRef: (idx: number) => MainThread.Element | null,
-    getPipeBotRef: (idx: number) => MainThread.Element | null,
-  ): void {
-    'main thread';
-    const prev = stressLevelRef.current;
-    stressLevelRef.current = newLevel;
-
-    const newCount = LEVEL_BIRD_COUNT[newLevel] ?? SHADOW_BIRD_COUNT;
-
-    if (prev === 0 && newLevel >= 1) {
-      showShadowBirds(true, newCount);
-    } else if (newLevel === 0) {
+    if (birds > 0) {
+      showShadowBirds(true, birds);
+    } else if (prevBirds > 0) {
       showShadowBirds(false, 0);
-      resetPipeColors(getPipeTopRef, getPipeBotRef);
-    } else if (newLevel >= 1) {
-      // Level changed between L1-L4: adjust visible bird count
-      showShadowBirds(true, newCount);
     }
   }
 
-  // L3+: Cross-thread flood — multiple runOnBackground calls per frame
-  // L6 doubles the flood rate
+  // Cross-thread flood — calls driven by floodRef
   function sendStressSnapshot(snapshot: Record<string, unknown>): void {
     'main thread';
-    if (stressLevelRef.current < 3) return;
-    const level = stressLevelRef.current;
+    const flood = floodRef.current;
+    if (flood === 0) return;
     snapshot['_pad'] = PAYLOAD_PAD;
     const json = JSON.stringify(snapshot);
-    const calls = level >= 6 ? FLOOD_CALLS_PER_FRAME * 2 : FLOOD_CALLS_PER_FRAME;
-    for (let k = 0; k < calls; k++) {
+    for (let k = 0; k < flood; k++) {
       runOnBackground(setStressPayload)(json + k);
     }
   }
 
   return {
-    stressLevelRef,
+    birdCountRef,
+    heavyRef,
+    floodRef,
     shadowRefs,
     shadowImgRefs,
-    showShadowBirds,
     updateShadowBirds,
-    applyPipeColorCycling,
-    resetPipeColors,
-    applyStressLevel,
+    applyStressConfig,
     sendStressSnapshot,
   };
 }

@@ -51,7 +51,7 @@ import { GameOverScreen } from './GameOverScreen.js';
 import { PipePair } from './PipePair.js';
 import { useDebugMode } from './useDebugMode.js';
 import type { DebugSnapshot } from './useDebugMode.js';
-import { useStressTest, SHADOW_X, SHADOW_BIRD_COUNT } from './useStressTest.js';
+import { useStressTest, SHADOW_X, SHADOW_BIRD_COUNT, BIRD_COUNT_OPTIONS, FLOOD_OPTIONS } from './useStressTest.js';
 
 const allBirdFrames = [
   [yellowBirdMid, yellowBirdDown, yellowBirdMid, yellowBirdUp],
@@ -105,7 +105,7 @@ export function Game() {
   // Debug mode
   const {
     debugMode, setDebugMode, debugModeRef,
-    debugTextRef, mtsBtsLedRef, btsMtsLedRef,
+    debugTextRef, mtsBtsLedRef, btsMtsLedRef, mtsBtsCountRef,
     gap0Ref, gap1Ref, gap2Ref, gap3Ref,
     boundaryTopRef, boundaryBottomRef,
     applyDebugOverlay, updateBoundaryLines, flashMtsToBts, flashBtsToMts,
@@ -113,16 +113,15 @@ export function Game() {
     startLongPress, endLongPress,
   } = useDebugMode();
 
-  // Stress test
-  const [stressLevel, setStressLevelBTS] = useState(0);
+  // Stress test — orthogonal config
+  const [stressBirds, setStressBirds] = useState(0);
+  const [stressHeavy, setStressHeavy] = useState(0);
+  const [stressFlood, setStressFlood] = useState(0);
   const {
-    stressLevelRef,
+    birdCountRef, heavyRef, floodRef,
     shadowRefs, shadowImgRefs,
-    showShadowBirds,
     updateShadowBirds,
-    applyPipeColorCycling,
-    resetPipeColors,
-    applyStressLevel,
+    applyStressConfig,
     sendStressSnapshot,
   } = useStressTest();
 
@@ -313,7 +312,9 @@ export function Game() {
       pipesGapY: pipesGapYRef.current,
       score: scoreRef.current,
       pointerMode: lastPointerRef.current,
-      stressLevel: stressLevelRef.current,
+      stressBirds: birdCountRef.current,
+      stressHeavy: heavyRef.current,
+      stressFlood: floodRef.current,
     };
   }
 
@@ -354,10 +355,10 @@ export function Game() {
       updateBirdSprite();
     } else {
       // Reset stress test when leaving debug mode
-      if (stressLevelRef.current > 0) {
-        applyStressLevel(0, getPipeTopRef, getPipeBotRef);
-      }
-      runOnBackground(setStressLevelBTS)(0);
+      applyStressConfig(0, 0, 0);
+      runOnBackground(setStressBirds)(0);
+      runOnBackground(setStressHeavy)(0);
+      runOnBackground(setStressFlood)(0);
       // Re-randomize when leaving debug mode
       randomizeVariants();
     }
@@ -635,9 +636,8 @@ export function Game() {
 
     updateDebugText(timestamp, getDebugSnapshot());
 
-    // Stress test: L1 shadow birds, L2 pipe colors, L3 cross-thread flood
+    // Stress test
     updateShadowBirds(birdYRef.current, birdRotationRef.current, wingFrameRef.current, allBirdFrames);
-    applyPipeColorCycling(getPipeTopRef, getPipeBotRef, pipeCountRef.current);
     sendStressSnapshot({
       birdY: birdYRef.current,
       velocity: velocityRef.current,
@@ -648,6 +648,10 @@ export function Game() {
       pipesGapY: pipesGapYRef.current.slice(),
       timestamp,
     });
+    // Count flood messages in debug stats
+    if (floodRef.current > 0) {
+      mtsBtsCountRef.current += floodRef.current;
+    }
 
     requestAnimationFrame(gameTick);
   }
@@ -675,6 +679,10 @@ export function Game() {
 
     // Shadow birds follow idle bob
     updateShadowBirds(y, 0, wingFrameRef.current, allBirdFrames);
+    sendStressSnapshot({ birdY: y, velocity: 0, rotation: 0, score: 0, pipeCount: 0, pipesX: [], pipesGapY: [], timestamp });
+    if (floodRef.current > 0) {
+      mtsBtsCountRef.current += floodRef.current;
+    }
 
     updateDebugText(timestamp, getDebugSnapshot());
     requestAnimationFrame(idleBob);
@@ -884,31 +892,67 @@ export function Game() {
           />
         )}
 
-        {/* Stress level buttons — BTS-rendered, visible in debug mode */}
+        {/* Stress test panel — BTS-rendered, visible in debug mode */}
         {debugMode && (
-          <view className="stress-btn-group" style={{ bottom: `${groundHeight + 18}px` }}>
-            {[1, 2, 3, 4, 5, 6].map(l => (
+          <view className="stress-panel" style={{ bottom: `${groundHeight + 18}px` }}>
+            <view className="stress-row">
+              {BIRD_COUNT_OPTIONS.map(n => (
+                <view
+                  key={`b-${n}`}
+                  className="stress-btn"
+                  style={{ backgroundColor: stressBirds === n ? 'rgba(0, 255, 136, 0.25)' : 'transparent' }}
+                  bindtap={() => {
+                    const next = stressBirds === n ? 0 : n;
+                    setStressBirds(next);
+                    void runOnMainThread((b: number, h: number, f: number) => {
+                      'main thread';
+                      applyStressConfig(b, h, f);
+                    })(next, stressHeavy, stressFlood);
+                  }}
+                >
+                  <text className="stress-btn-text" style={{ color: stressBirds === n ? '#ffffff' : 'rgba(0, 255, 136, 0.6)' }}>
+                    {n}
+                  </text>
+                </view>
+              ))}
+            </view>
+            <view className="stress-row">
               <view
-                key={`stress-${l}`}
                 className="stress-btn"
-                style={{ backgroundColor: stressLevel === l ? 'rgba(0, 255, 136, 0.25)' : 'transparent' }}
+                style={{ backgroundColor: stressHeavy ? 'rgba(0, 255, 136, 0.25)' : 'transparent' }}
                 bindtap={() => {
-                  const next = stressLevel === l ? 0 : l;
-                  setStressLevelBTS(next);
-                  void runOnMainThread((level: number) => {
+                  const next = stressHeavy ? 0 : 1;
+                  setStressHeavy(next);
+                  void runOnMainThread((b: number, h: number, f: number) => {
                     'main thread';
-                    applyStressLevel(level, getPipeTopRef, getPipeBotRef);
-                  })(next);
+                    applyStressConfig(b, h, f);
+                  })(stressBirds, next, stressFlood);
                 }}
               >
-                <text
-                  className="stress-btn-text"
-                  style={{ color: stressLevel === l ? '#ffffff' : 'rgba(0, 255, 136, 0.6)' }}
-                >
-                  L{l}
+                <text className="stress-btn-text" style={{ color: stressHeavy ? '#ffffff' : 'rgba(0, 255, 136, 0.6)' }}>
+                  mut
                 </text>
               </view>
-            ))}
+              {FLOOD_OPTIONS.map(n => (
+                <view
+                  key={`f-${n}`}
+                  className="stress-btn"
+                  style={{ backgroundColor: stressFlood === n ? 'rgba(0, 255, 136, 0.25)' : 'transparent' }}
+                  bindtap={() => {
+                    const next = stressFlood === n ? 0 : n;
+                    setStressFlood(next);
+                    void runOnMainThread((b: number, h: number, f: number) => {
+                      'main thread';
+                      applyStressConfig(b, h, f);
+                    })(stressBirds, stressHeavy, next);
+                  }}
+                >
+                  <text className="stress-btn-text" style={{ color: stressFlood === n ? '#ffffff' : 'rgba(0, 255, 136, 0.6)' }}>
+                    {n}x
+                  </text>
+                </view>
+              ))}
+            </view>
           </view>
         )}
       </view>

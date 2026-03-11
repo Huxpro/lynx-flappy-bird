@@ -12,7 +12,9 @@ export interface DebugSnapshot {
   pipesGapY: number[];
   score: number;
   pointerMode: string;
-  stressLevel: number;
+  stressBirds: number;
+  stressHeavy: number;
+  stressFlood: number;
 }
 
 export function useDebugMode() {
@@ -135,8 +137,8 @@ export function useDebugMode() {
       `rot: ${snap.rotation.toFixed(0)}°  bird: ${snap.birdVariant === 3 ? 'lynx' : ['yel', 'blu', 'red'][snap.birdVariant]}`,
       `pipe: ${pipeInfo}  n:${snap.pipeCount}`,
       `score: ${snap.score}`,
-      `stress: L${snap.stressLevel}`,
-      `mts→bts: ${mtsBtsCountRef.current}  bts→mts: ${btsMtsCountRef.current}`,
+      `stress: ${snap.stressBirds > 0 || snap.stressFlood > 0 ? [snap.stressBirds > 0 ? `${snap.stressBirds}` : '', snap.stressHeavy ? 'mut' : '', snap.stressFlood > 0 ? `${snap.stressFlood}x` : ''].filter(Boolean).join('+') : 'off'}`,
+      `mts→bts: ${mtsBtsCountRef.current}${snap.stressFlood > 0 ? ` (${snap.stressFlood}/f)` : ''}  bts→mts: ${btsMtsCountRef.current}`,
       `ptr: ${snap.pointerMode}`,
     ];
     debugTextRef.current.setAttribute('text', lines.join('\n'));
@@ -213,6 +215,8 @@ export function useDebugMode() {
     gap3Ref,
     boundaryTopRef,
     boundaryBottomRef,
+    // MTS counter ref (for external flood counting)
+    mtsBtsCountRef,
     // MTS functions
     applyDebugOverlay,
     updateBoundaryLines,
