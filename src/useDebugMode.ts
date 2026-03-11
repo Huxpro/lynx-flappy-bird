@@ -178,9 +178,12 @@ export function useDebugMode() {
 
   function startLongPress(onFired: () => void): void {
     'main thread';
+    // Guard against double-fire (touch + synthesized mouse on mobile web)
+    if (longPressTimerRef.current) return;
     longPressFiredRef.current = false;
     longPressTimerRef.current = setTimeout(() => {
       longPressFiredRef.current = true;
+      longPressTimerRef.current = 0;
       onFired();
     }, 500) as unknown as number;
   }
@@ -188,6 +191,7 @@ export function useDebugMode() {
   function endLongPress(): boolean {
     'main thread';
     clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = 0;
     return longPressFiredRef.current;
   }
 
