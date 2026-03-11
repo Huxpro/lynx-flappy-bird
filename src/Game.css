@@ -39,6 +39,15 @@
   top: 200px;
 }
 
+/* Shadow birds (stress test L1+) — same as .bird but translucent, no fixed left */
+.shadow-bird {
+  position: absolute;
+  width: 34px;
+  height: 24px;
+  top: 200px;
+  opacity: 0.5;
+}
+
 .bird-img {
   width: 34px;
   height: 24px;

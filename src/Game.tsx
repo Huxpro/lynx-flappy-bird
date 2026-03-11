@@ -51,6 +51,7 @@ import { GameOverScreen } from './GameOverScreen.js';
 import { PipePair } from './PipePair.js';
 import { useDebugMode } from './useDebugMode.js';
 import type { DebugSnapshot } from './useDebugMode.js';
+import { useStressTest, SHADOW_X } from './useStressTest.js';
 
 const allBirdFrames = [
   [yellowBirdMid, yellowBirdDown, yellowBirdMid, yellowBirdUp],
@@ -111,6 +112,20 @@ export function Game() {
     updateDebugText, updateGapZone,
     startLongPress, endLongPress,
   } = useDebugMode();
+
+  // Stress test
+  const {
+    stressLevelRef,
+    sb0Ref, sb0ImgRef, sb1Ref, sb1ImgRef,
+    sb2Ref, sb2ImgRef, sb3Ref, sb3ImgRef,
+    sb4Ref, sb4ImgRef, sb5Ref, sb5ImgRef,
+    sb6Ref, sb6ImgRef, sb7Ref, sb7ImgRef,
+    showShadowBirds,
+    updateShadowBirds,
+    applyPipeColorCycling,
+    resetPipeColors,
+    sendStressSnapshot,
+  } = useStressTest();
 
   // Once a real touch event is observed, ignore all mouse events (synthesized).
   // This self-adapts: mobile sets it on first tap, desktop never sets it.
@@ -300,6 +315,7 @@ export function Game() {
       pipesGapY: pipesGapYRef.current,
       score: scoreRef.current,
       pointerMode: lastPointerRef.current,
+      stressLevel: stressLevelRef.current,
     };
   }
 
@@ -332,14 +348,30 @@ export function Game() {
 
   function toggleDebugMode(): void {
     'main thread';
-    debugModeRef.current = !debugModeRef.current;
-    if (debugModeRef.current) {
-      // Force lynxbird in debug mode
+    // Cycle: OFF → L0 (debug ON) → L1 → L2 → L3 → OFF
+    if (!debugModeRef.current) {
+      // OFF → L0: enable debug mode
+      debugModeRef.current = true;
+      stressLevelRef.current = 0;
       birdVariantRef.current = 3;
       applyBirdScale();
       updateBirdSprite();
+    } else if (stressLevelRef.current === 0) {
+      // L0 → L1: element flood — show shadow birds
+      stressLevelRef.current = 1;
+      showShadowBirds(true);
+    } else if (stressLevelRef.current === 1) {
+      // L1 → L2: style mutation storm (per-frame pipe color cycling)
+      stressLevelRef.current = 2;
+    } else if (stressLevelRef.current === 2) {
+      // L2 → L3: cross-thread flood
+      stressLevelRef.current = 3;
     } else {
-      // Re-randomize when leaving debug mode
+      // L3 → OFF: disable everything
+      debugModeRef.current = false;
+      stressLevelRef.current = 0;
+      showShadowBirds(false);
+      resetPipeColors(getPipeTopRef, getPipeBotRef);
       randomizeVariants();
     }
     applyDebugOverlay(birdRef);
@@ -615,6 +647,21 @@ export function Game() {
     }
 
     updateDebugText(timestamp, getDebugSnapshot());
+
+    // Stress test: L1 shadow birds, L2 pipe colors, L3 cross-thread flood
+    updateShadowBirds(birdYRef.current, birdRotationRef.current, wingFrameRef.current, allBirdFrames);
+    applyPipeColorCycling(getPipeTopRef, getPipeBotRef, pipeCountRef.current);
+    sendStressSnapshot({
+      birdY: birdYRef.current,
+      velocity: velocityRef.current,
+      rotation: birdRotationRef.current,
+      score: scoreRef.current,
+      pipeCount: pipeCountRef.current,
+      pipesX: pipesXRef.current.slice(),
+      pipesGapY: pipesGapYRef.current.slice(),
+      timestamp,
+    });
+
     requestAnimationFrame(gameTick);
   }
 
@@ -638,6 +685,9 @@ export function Game() {
       wingFrameRef.current = (wingFrameRef.current + 1) % 4;
       updateBirdSprite();
     }
+
+    // Shadow birds follow idle bob
+    updateShadowBirds(y, 0, wingFrameRef.current, allBirdFrames);
 
     updateDebugText(timestamp, getDebugSnapshot());
     requestAnimationFrame(idleBob);
@@ -764,6 +814,32 @@ export function Game() {
         </view>
         <view className="ground-strip" main-thread:ref={ground2Ref} style={{ left: `${GROUND_WIDTH * 2}px` }}>
           <image src={base} className="ground-img" />
+        </view>
+
+        {/* Shadow birds (stress test L1+) */}
+        <view className="shadow-bird" main-thread:ref={sb0Ref} style={{ display: 'none', left: `${SHADOW_X[0]}px` }}>
+          <image src={yellowBirdMid} className="bird-img" main-thread:ref={sb0ImgRef} />
+        </view>
+        <view className="shadow-bird" main-thread:ref={sb1Ref} style={{ display: 'none', left: `${SHADOW_X[1]}px` }}>
+          <image src={yellowBirdMid} className="bird-img" main-thread:ref={sb1ImgRef} />
+        </view>
+        <view className="shadow-bird" main-thread:ref={sb2Ref} style={{ display: 'none', left: `${SHADOW_X[2]}px` }}>
+          <image src={blueBirdMid} className="bird-img" main-thread:ref={sb2ImgRef} />
+        </view>
+        <view className="shadow-bird" main-thread:ref={sb3Ref} style={{ display: 'none', left: `${SHADOW_X[3]}px` }}>
+          <image src={blueBirdMid} className="bird-img" main-thread:ref={sb3ImgRef} />
+        </view>
+        <view className="shadow-bird" main-thread:ref={sb4Ref} style={{ display: 'none', left: `${SHADOW_X[4]}px` }}>
+          <image src={redBirdMid} className="bird-img" main-thread:ref={sb4ImgRef} />
+        </view>
+        <view className="shadow-bird" main-thread:ref={sb5Ref} style={{ display: 'none', left: `${SHADOW_X[5]}px` }}>
+          <image src={redBirdMid} className="bird-img" main-thread:ref={sb5ImgRef} />
+        </view>
+        <view className="shadow-bird" main-thread:ref={sb6Ref} style={{ display: 'none', left: `${SHADOW_X[6]}px` }}>
+          <image src={lynxBirdMid} className="bird-img" main-thread:ref={sb6ImgRef} />
+        </view>
+        <view className="shadow-bird" main-thread:ref={sb7Ref} style={{ display: 'none', left: `${SHADOW_X[7]}px` }}>
+          <image src={lynxBirdMid} className="bird-img" main-thread:ref={sb7ImgRef} />
         </view>
 
         {/* Bird */}

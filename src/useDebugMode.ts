@@ -12,6 +12,7 @@ export interface DebugSnapshot {
   pipesGapY: number[];
   score: number;
   pointerMode: string;
+  stressLevel: number;
 }
 
 export function useDebugMode() {
@@ -134,6 +135,7 @@ export function useDebugMode() {
       `rot: ${snap.rotation.toFixed(0)}°  bird: ${snap.birdVariant === 3 ? 'lynx' : ['yel', 'blu', 'red'][snap.birdVariant]}`,
       `pipe: ${pipeInfo}  n:${snap.pipeCount}`,
       `score: ${snap.score}`,
+      `stress: L${snap.stressLevel}`,
       `mts→bts: ${mtsBtsCountRef.current}  bts→mts: ${btsMtsCountRef.current}`,
       `ptr: ${snap.pointerMode}`,
     ];
