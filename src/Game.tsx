@@ -887,7 +887,7 @@ export function Game() {
         {/* Stress level buttons — BTS-rendered, visible in debug mode */}
         {debugMode && (
           <view className="stress-btn-group" style={{ bottom: `${groundHeight + 18}px` }}>
-            {[1, 2, 3, 4].map(l => (
+            {[1, 2, 3, 4, 5, 6].map(l => (
               <view
                 key={`stress-${l}`}
                 className="stress-btn"
@@ -901,7 +901,12 @@ export function Game() {
                   })(next);
                 }}
               >
-                <text className="stress-btn-text">L{l}</text>
+                <text
+                  className="stress-btn-text"
+                  style={{ color: stressLevel === l ? '#ffffff' : 'rgba(0, 255, 136, 0.6)' }}
+                >
+                  L{l}
+                </text>
               </view>
             ))}
           </view>

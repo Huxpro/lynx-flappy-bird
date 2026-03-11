@@ -3,9 +3,10 @@ import { runOnBackground } from '@lynx-js/react';
 import type { MainThread } from '@lynx-js/types';
 
 // ===== Configuration =====
-// Total shadow bird elements (all allocated upfront; L4 shows all, L1-L3 show BASE count)
-export const SHADOW_BIRD_COUNT = 96;
-export const BASE_BIRD_COUNT = 32;
+// Total shadow bird elements (all allocated upfront; higher levels show more)
+export const SHADOW_BIRD_COUNT = 400;
+// Per-level bird counts: L1-L3 → 32, L4 → 96, L5 → 200, L6 → 400 + double flood
+export const LEVEL_BIRD_COUNT = [0, 32, 32, 32, 96, 200, 400];
 
 // L3+ cross-thread flood: N calls per frame, each with padded payload
 const FLOOD_CALLS_PER_FRAME = 10;
@@ -72,7 +73,7 @@ export function useStressTest() {
     'main thread';
     if (stressLevelRef.current < 1) return;
     const level = stressLevelRef.current;
-    const count = level >= 4 ? SHADOW_BIRD_COUNT : BASE_BIRD_COUNT;
+    const count = LEVEL_BIRD_COUNT[level] ?? SHADOW_BIRD_COUNT;
     for (let i = 0; i < count; i++) {
       const container = shadowRefs[i]?.current;
       const img = shadowImgRefs[i]?.current;
@@ -137,7 +138,7 @@ export function useStressTest() {
     const prev = stressLevelRef.current;
     stressLevelRef.current = newLevel;
 
-    const newCount = newLevel >= 4 ? SHADOW_BIRD_COUNT : BASE_BIRD_COUNT;
+    const newCount = LEVEL_BIRD_COUNT[newLevel] ?? SHADOW_BIRD_COUNT;
 
     if (prev === 0 && newLevel >= 1) {
       showShadowBirds(true, newCount);
@@ -151,13 +152,15 @@ export function useStressTest() {
   }
 
   // L3+: Cross-thread flood — multiple runOnBackground calls per frame
+  // L6 doubles the flood rate
   function sendStressSnapshot(snapshot: Record<string, unknown>): void {
     'main thread';
     if (stressLevelRef.current < 3) return;
+    const level = stressLevelRef.current;
     snapshot['_pad'] = PAYLOAD_PAD;
     const json = JSON.stringify(snapshot);
-    for (let k = 0; k < FLOOD_CALLS_PER_FRAME; k++) {
-      // Unique suffix prevents any dedup; each call is a real cross-thread message
+    const calls = level >= 6 ? FLOOD_CALLS_PER_FRAME * 2 : FLOOD_CALLS_PER_FRAME;
+    for (let k = 0; k < calls; k++) {
       runOnBackground(setStressPayload)(json + k);
     }
   }
