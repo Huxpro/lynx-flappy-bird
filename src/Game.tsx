@@ -117,12 +117,13 @@ export function Game() {
   const {
     stressLevelRef,
     shadowRefs, shadowImgRefs,
-    stressBtnRef, stressBtnTextRef,
+    stressGroupRef, stressBtnRefs,
     showShadowBirds,
     updateShadowBirds,
     applyPipeColorCycling,
     resetPipeColors,
-    cycleStressLevel,
+    setStressLevel,
+    updateStressBtnHighlight,
     sendStressSnapshot,
   } = useStressTest();
   // Double-fire guard for stress button (same pattern as main touch area)
@@ -272,8 +273,8 @@ export function Game() {
     if (btsMtsLedRef.current) {
       btsMtsLedRef.current.setStyleProperty('bottom', `${gH + 6}px`);
     }
-    if (stressBtnRef.current) {
-      stressBtnRef.current.setStyleProperty('bottom', `${gH + 18}px`);
+    if (stressGroupRef.current) {
+      stressGroupRef.current.setStyleProperty('bottom', `${gH + 18}px`);
     }
 
     // Update debug boundary lines
@@ -365,15 +366,13 @@ export function Game() {
         showShadowBirds(false);
         resetPipeColors(getPipeTopRef, getPipeBotRef);
       }
-      if (stressBtnTextRef.current) {
-        stressBtnTextRef.current.setAttribute('text', 'L0');
-      }
+      updateStressBtnHighlight();
       // Re-randomize when leaving debug mode
       randomizeVariants();
     }
-    // Show/hide stress button together with debug overlay
-    if (stressBtnRef.current) {
-      stressBtnRef.current.setStyleProperty('display', debugModeRef.current ? 'flex' : 'none');
+    // Show/hide stress button group together with debug overlay
+    if (stressGroupRef.current) {
+      stressGroupRef.current.setStyleProperty('display', debugModeRef.current ? 'flex' : 'none');
     }
     applyDebugOverlay(birdRef);
     flashMtsToBts();
@@ -703,16 +702,41 @@ export function Game() {
 
   // ===== Touch Handlers (MTS) =====
 
-  function onStressBtnDown(_e: MainThread.TouchEvent): void {
-    'main thread';
-    if (stressBtnPressedRef.current) return;
-    stressBtnPressedRef.current = true;
-    cycleStressLevel(getPipeTopRef, getPipeBotRef);
-  }
-
   function onStressBtnUp(_e: MainThread.TouchEvent): void {
     'main thread';
+    const isTouch = !!(_e as any).touches;
+    if (!isTouch && hasTouchRef.current) return;
     stressBtnPressedRef.current = false;
+  }
+
+  function onStressBtn1Down(_e: MainThread.TouchEvent): void {
+    'main thread';
+    const isTouch = !!(_e as any).touches;
+    if (isTouch) hasTouchRef.current = true;
+    else if (hasTouchRef.current) return;
+    if (stressBtnPressedRef.current) return;
+    stressBtnPressedRef.current = true;
+    setStressLevel(1, getPipeTopRef, getPipeBotRef);
+  }
+
+  function onStressBtn2Down(_e: MainThread.TouchEvent): void {
+    'main thread';
+    const isTouch = !!(_e as any).touches;
+    if (isTouch) hasTouchRef.current = true;
+    else if (hasTouchRef.current) return;
+    if (stressBtnPressedRef.current) return;
+    stressBtnPressedRef.current = true;
+    setStressLevel(2, getPipeTopRef, getPipeBotRef);
+  }
+
+  function onStressBtn3Down(_e: MainThread.TouchEvent): void {
+    'main thread';
+    const isTouch = !!(_e as any).touches;
+    if (isTouch) hasTouchRef.current = true;
+    else if (hasTouchRef.current) return;
+    if (stressBtnPressedRef.current) return;
+    stressBtnPressedRef.current = true;
+    setStressLevel(3, getPipeTopRef, getPipeBotRef);
   }
 
   function onTouchStart(_e: MainThread.TouchEvent): void {
@@ -910,18 +934,41 @@ export function Game() {
           />
         )}
 
-        {/* Stress level button — visible in debug mode, sits on top of touch area */}
-        <view
-          className="stress-btn"
-          main-thread:ref={stressBtnRef}
-          style={{ display: 'none' }}
-          main-thread:bindtouchstart={onStressBtnDown}
-          main-thread:bindtouchend={onStressBtnUp}
-          main-thread:bindtouchcancel={onStressBtnUp}
-          main-thread:bindmousedown={onStressBtnDown as any}
-          main-thread:bindmouseup={onStressBtnUp as any}
-        >
-          <text className="stress-btn-text" main-thread:ref={stressBtnTextRef}>L0</text>
+        {/* Stress level buttons — visible in debug mode, sits on top of touch area */}
+        <view className="stress-btn-group" main-thread:ref={stressGroupRef} style={{ display: 'none' }}>
+          <view
+            className="stress-btn"
+            main-thread:ref={stressBtnRefs[0]}
+            main-thread:bindtouchstart={onStressBtn1Down}
+            main-thread:bindtouchend={onStressBtnUp}
+            main-thread:bindtouchcancel={onStressBtnUp}
+            main-thread:bindmousedown={onStressBtn1Down as any}
+            main-thread:bindmouseup={onStressBtnUp as any}
+          >
+            <text className="stress-btn-text">L1</text>
+          </view>
+          <view
+            className="stress-btn"
+            main-thread:ref={stressBtnRefs[1]}
+            main-thread:bindtouchstart={onStressBtn2Down}
+            main-thread:bindtouchend={onStressBtnUp}
+            main-thread:bindtouchcancel={onStressBtnUp}
+            main-thread:bindmousedown={onStressBtn2Down as any}
+            main-thread:bindmouseup={onStressBtnUp as any}
+          >
+            <text className="stress-btn-text">L2</text>
+          </view>
+          <view
+            className="stress-btn"
+            main-thread:ref={stressBtnRefs[2]}
+            main-thread:bindtouchstart={onStressBtn3Down}
+            main-thread:bindtouchend={onStressBtnUp}
+            main-thread:bindtouchcancel={onStressBtnUp}
+            main-thread:bindmousedown={onStressBtn3Down as any}
+            main-thread:bindmouseup={onStressBtnUp as any}
+          >
+            <text className="stress-btn-text">L3</text>
+          </view>
         </view>
       </view>
     </view>

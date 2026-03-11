@@ -237,14 +237,18 @@
   background-color: #0088ff;
 }
 
-/* Stress level button (visible in debug mode) */
-.stress-btn {
+/* Stress level buttons (visible in debug mode) */
+.stress-btn-group {
   position: absolute;
   right: 4px;
   bottom: 136px;
-  width: 28px;
-  height: 18px;
-  background-color: rgba(0, 0, 0, 0.6);
+  flex-direction: row;
+}
+
+.stress-btn {
+  width: 26px;
+  height: 20px;
+  margin-left: 2px;
   border-radius: 3px;
   justify-content: center;
   align-items: center;
@@ -253,7 +257,7 @@
 .stress-btn-text {
   font-size: 9px;
   font-family: monospace;
-  color: #00ff88;
+  color: rgba(0, 255, 136, 0.6);
   text-align: center;
 }
 

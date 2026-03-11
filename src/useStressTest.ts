@@ -5,7 +5,11 @@ import type { MainThread } from '@lynx-js/types';
 // ===== Configuration =====
 // Change this one constant to adjust the number of shadow birds.
 // All refs, positions, and loop bounds derive from it.
-export const SHADOW_BIRD_COUNT = 8;
+export const SHADOW_BIRD_COUNT = 32;
+
+// L3 cross-thread flood: N calls per frame, each with padded payload
+const FLOOD_CALLS_PER_FRAME = 10;
+const PAYLOAD_PAD = 'x'.repeat(1024); // 1KB padding per call
 
 // Compute shadow bird X positions: evenly spaced across game width.
 // Overlap with main bird (x=60) is fine — shadows are translucent
@@ -40,9 +44,13 @@ export function useStressTest() {
     shadowImgRefs.push(useMainThreadRef<MainThread.Element>(null));
   }
 
-  // Stress level button refs
-  const stressBtnRef = useMainThreadRef<MainThread.Element>(null);
-  const stressBtnTextRef = useMainThreadRef<MainThread.Element>(null);
+  // Stress button group: container + 3 individual button refs for highlight
+  const stressGroupRef = useMainThreadRef<MainThread.Element>(null);
+  const stressBtnRefs: { current: MainThread.Element | null }[] = [];
+  for (let i = 0; i < 3; i++) {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    stressBtnRefs.push(useMainThreadRef<MainThread.Element>(null));
+  }
 
   // ===== MTS helpers (callee-before-caller order) =====
 
@@ -53,12 +61,15 @@ export function useStressTest() {
       const ref = shadowRefs[i]?.current;
       if (ref) {
         ref.setStyleProperty('display', visible ? 'flex' : 'none');
+        // Reset opacity to CSS default when re-showing (L2+ flicker may have changed it)
+        if (visible) ref.setStyleProperty('opacity', '0.5');
       }
     }
   }
 
   // L1: Update shadow birds to match main bird state
   // N birds × (2 setStyleProperty + 1 setAttribute) MTS ops per frame
+  // L2+: extra style mutations per bird (opacity flicker) for more pressure
   function updateShadowBirds(
     birdY: number,
     rotation: number,
@@ -67,12 +78,18 @@ export function useStressTest() {
   ): void {
     'main thread';
     if (stressLevelRef.current < 1) return;
+    const level = stressLevelRef.current;
     for (let i = 0; i < SHADOW_BIRD_COUNT; i++) {
       const container = shadowRefs[i]?.current;
       const img = shadowImgRefs[i]?.current;
       if (container) {
         container.setStyleProperty('top', `${birdY}px`);
         container.setStyleProperty('transform', `rotate(${rotation}deg)`);
+        // L2+: per-bird opacity flicker — extra setStyleProperty per bird per frame
+        if (level >= 2) {
+          const flicker = 0.3 + 0.2 * Math.sin(hueRef.current * 0.1 + i);
+          container.setStyleProperty('opacity', `${flicker.toFixed(2)}`);
+        }
       }
       if (img) {
         // Each variant ×2, classic birds only (skip lynx — different size)
@@ -117,49 +134,64 @@ export function useStressTest() {
     }
   }
 
-  // Cycle stress level: L0 → L1 → L2 → L3 → L0
-  function cycleStressLevel(
+  // Update button highlights to reflect current stress level
+  function updateStressBtnHighlight(): void {
+    'main thread';
+    const level = stressLevelRef.current;
+    for (let i = 0; i < 3; i++) {
+      const btn = stressBtnRefs[i]?.current;
+      if (btn) {
+        const isActive = level === i + 1;
+        btn.setStyleProperty('background-color', isActive ? 'rgba(0, 255, 136, 0.25)' : 'transparent');
+      }
+    }
+  }
+
+  // Set stress level directly; tapping the active level toggles back to L0
+  function setStressLevel(
+    target: number,
     getPipeTopRef: (idx: number) => MainThread.Element | null,
     getPipeBotRef: (idx: number) => MainThread.Element | null,
   ): void {
     'main thread';
     const prev = stressLevelRef.current;
-    const next = (prev + 1) % 4;
+    const next = prev === target ? 0 : target;
     stressLevelRef.current = next;
 
-    // Show shadow birds when entering L1+
     if (prev === 0 && next >= 1) showShadowBirds(true);
-    // Hide shadow birds + reset pipes when cycling back to L0
     if (next === 0) {
       showShadowBirds(false);
       resetPipeColors(getPipeTopRef, getPipeBotRef);
     }
 
-    if (stressBtnTextRef.current) {
-      stressBtnTextRef.current.setAttribute('text', `L${next}`);
-    }
+    updateStressBtnHighlight();
   }
 
-  // L3: Cross-thread flood — send full game state snapshot to BTS every frame
-  // Costs: JSON.stringify on MTS + postMessage serialization + BTS setState
+  // L3: Cross-thread flood — multiple runOnBackground calls per frame
+  // Costs: JSON.stringify on MTS + N × (postMessage serialization + BTS setState)
   function sendStressSnapshot(snapshot: Record<string, unknown>): void {
     'main thread';
     if (stressLevelRef.current < 3) return;
+    snapshot['_pad'] = PAYLOAD_PAD;
     const json = JSON.stringify(snapshot);
-    runOnBackground(setStressPayload)(json);
+    for (let k = 0; k < FLOOD_CALLS_PER_FRAME; k++) {
+      // Unique suffix prevents any dedup; each call is a real cross-thread message
+      runOnBackground(setStressPayload)(json + k);
+    }
   }
 
   return {
     stressLevelRef,
     shadowRefs,
     shadowImgRefs,
-    stressBtnRef,
-    stressBtnTextRef,
+    stressGroupRef,
+    stressBtnRefs,
     showShadowBirds,
     updateShadowBirds,
     applyPipeColorCycling,
     resetPipeColors,
-    cycleStressLevel,
+    setStressLevel,
+    updateStressBtnHighlight,
     sendStressSnapshot,
   };
 }
