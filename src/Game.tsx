@@ -812,14 +812,20 @@ export function Game() {
         <view className="debug-boundary" main-thread:ref={boundaryBottomRef} style={{ display: 'none' }} />
 
         {/* Touch area — must be last to sit on top of overlays */}
+        {/* Web: bind mouse only (browser synthesizes mouse from touch, avoiding double-fire).
+            Native: bind touch (no mouse events available). */}
         {gameState !== 'gameover' && (
-          <view
-            className="touch-area"
-            main-thread:bindtouchstart={onTouchStart}
-            main-thread:bindtouchend={onTouchEnd}
-            main-thread:bindmousedown={onTouchStart as any}
-            main-thread:bindmouseup={onTouchEnd as any}
-          />
+          SystemInfo.platform === 'web'
+            ? <view
+                className="touch-area"
+                main-thread:bindmousedown={onTouchStart as any}
+                main-thread:bindmouseup={onTouchEnd as any}
+              />
+            : <view
+                className="touch-area"
+                main-thread:bindtouchstart={onTouchStart}
+                main-thread:bindtouchend={onTouchEnd}
+              />
         )}
       </view>
     </view>
