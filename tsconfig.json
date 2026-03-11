@@ -1,18 +1,15 @@
 {
-  "extends": "../../tsconfig.json",
   "compilerOptions": {
     "jsx": "react-jsx",
     "jsxImportSource": "@lynx-js/react",
     "noEmit": true,
     "allowJs": true,
     "checkJs": true,
-    "isolatedDeclarations": false
+    "isolatedDeclarations": false,
+    "strict": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true
   },
-  "include": ["src", "lynx.config.js"],
-  "references": [
-    { "path": "../../packages/react/tsconfig.json" },
-    { "path": "../../packages/rspeedy/core/tsconfig.build.json" },
-    { "path": "../../packages/rspeedy/plugin-qrcode/tsconfig.build.json" },
-    { "path": "../../packages/rspeedy/plugin-react/tsconfig.build.json" }
-  ]
+  "include": ["src", "lynx.config.js"]
 }
