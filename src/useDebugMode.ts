@@ -35,6 +35,10 @@ export function useDebugMode() {
   const gap2Ref = useMainThreadRef<MainThread.Element>(null);
   const gap3Ref = useMainThreadRef<MainThread.Element>(null);
 
+  // Pipe spawn boundary lines (upper/lower safe area limits)
+  const boundaryTopRef = useMainThreadRef<MainThread.Element>(null);
+  const boundaryBottomRef = useMainThreadRef<MainThread.Element>(null);
+
   // ===== MTS functions (callee-before-caller order) =====
 
   function getGapRef(idx: number) {
@@ -60,6 +64,12 @@ export function useDebugMode() {
     }
     if (btsMtsLedRef.current) {
       btsMtsLedRef.current.setStyleProperty('display', on ? 'flex' : 'none');
+    }
+    if (boundaryTopRef.current) {
+      boundaryTopRef.current.setStyleProperty('display', on ? 'flex' : 'none');
+    }
+    if (boundaryBottomRef.current) {
+      boundaryBottomRef.current.setStyleProperty('display', on ? 'flex' : 'none');
     }
   }
 
@@ -145,6 +155,23 @@ export function useDebugMode() {
     }
   }
 
+  function updateBoundaryLines(playHeight: number, pipeGap: number): void {
+    'main thread';
+    // Must match spawnPipe's GAP_RANGE logic
+    const GAP_RANGE = 260;
+    const minGapY = Math.round((playHeight - GAP_RANGE) / 2);
+    const maxGapY = Math.round((playHeight + GAP_RANGE) / 2);
+    // Show extreme gap opening positions (not gap center)
+    const topLine = minGapY - pipeGap / 2; // topmost gap-top edge
+    const botLine = maxGapY + pipeGap / 2; // bottommost gap-bottom edge
+    if (boundaryTopRef.current) {
+      boundaryTopRef.current.setStyleProperty('top', `${topLine}px`);
+    }
+    if (boundaryBottomRef.current) {
+      boundaryBottomRef.current.setStyleProperty('top', `${botLine}px`);
+    }
+  }
+
   // Long press management
 
   function startLongPress(onFired: () => void): void {
@@ -176,8 +203,11 @@ export function useDebugMode() {
     gap1Ref,
     gap2Ref,
     gap3Ref,
+    boundaryTopRef,
+    boundaryBottomRef,
     // MTS functions
     applyDebugOverlay,
+    updateBoundaryLines,
     flashMtsToBts,
     flashBtsToMts,
     updateDebugText,

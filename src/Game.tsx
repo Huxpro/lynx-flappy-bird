@@ -72,6 +72,7 @@ export function Game() {
   const bgVariantRef = useMainThreadRef(0);
 
   // MTS refs for direct element manipulation
+  const containerRef = useMainThreadRef<MainThread.Element>(null);
   const bgRef = useMainThreadRef<MainThread.Element>(null);
   const bgImgRef = useMainThreadRef<MainThread.Element>(null);
   const scalerRef = useMainThreadRef<MainThread.Element>(null);
@@ -79,6 +80,7 @@ export function Game() {
   const birdImgRef = useMainThreadRef<MainThread.Element>(null);
   const ground0Ref = useMainThreadRef<MainThread.Element>(null);
   const ground1Ref = useMainThreadRef<MainThread.Element>(null);
+  const ground2Ref = useMainThreadRef<MainThread.Element>(null);
   const flashRef = useMainThreadRef<MainThread.Element>(null);
   const pipesContainerRef = useMainThreadRef<MainThread.Element>(null);
 
@@ -101,7 +103,8 @@ export function Game() {
     debugMode, setDebugMode, debugModeRef,
     debugTextRef, mtsBtsLedRef, btsMtsLedRef,
     gap0Ref, gap1Ref, gap2Ref, gap3Ref,
-    applyDebugOverlay, flashMtsToBts, flashBtsToMts,
+    boundaryTopRef, boundaryBottomRef,
+    applyDebugOverlay, updateBoundaryLines, flashMtsToBts, flashBtsToMts,
     updateDebugText, updateGapZone,
     startLongPress, endLongPress,
   } = useDebugMode();
@@ -112,6 +115,7 @@ export function Game() {
   const birdRotationRef = useMainThreadRef(0);
   const ground0XRef = useMainThreadRef(0);
   const ground1XRef = useMainThreadRef(GROUND_WIDTH);
+  const ground2XRef = useMainThreadRef(GROUND_WIDTH * 2);
   const gameStateRef = useMainThreadRef<'idle' | 'playing' | 'gameover'>('idle');
   const scoreRef = useMainThreadRef(10); // TODO: reset to 0 after testing
   const lastTimeRef = useMainThreadRef(0);
@@ -120,6 +124,8 @@ export function Game() {
   const idleTimeRef = useMainThreadRef(0);
 
   // Dynamic dimensions (computed once at init from screen size)
+  const dynamicGameWidthRef = useMainThreadRef(GAME_WIDTH);
+  const dynamicGroundHeightRef = useMainThreadRef(112);
   const dynamicPlayHeightRef = useMainThreadRef(400);
   const dynamicBirdStartYRef = useMainThreadRef(200);
 
@@ -165,16 +171,34 @@ export function Game() {
 
   function applyLayout(): void {
     'main thread';
-    const cssWidth = SystemInfo.pixelWidth / SystemInfo.pixelRatio;
-    const cssHeight = SystemInfo.pixelHeight / SystemInfo.pixelRatio;
+    // Try reading the actual container element dimensions (works on web all-on-ui
+    // where MTS elements are real HTMLElements). This makes the game adapt to the
+    // lynx-view container instead of the browser viewport.
+    // On native, clientWidth/clientHeight aren't available, so fall back to SystemInfo
+    // (which correctly reflects the LynxView dimensions on native).
+    const el = containerRef.current as any;
+    const elW = el?.clientWidth;
+    const elH = el?.clientHeight;
+    const sysW = SystemInfo.pixelWidth / SystemInfo.pixelRatio;
+    const sysH = SystemInfo.pixelHeight / SystemInfo.pixelRatio;
+    const cssWidth = (elW > 0) ? elW : sysW;
+    const cssHeight = (elH > 0) ? elH : sysH;
+    console.log(
+      `[applyLayout] el=${elW}x${elH} sys=${sysW}x${sysH} → used=${cssWidth}x${cssHeight}`,
+    );
     const layout = computeLayout(cssWidth, cssHeight);
+    console.log(
+      `[applyLayout] scale=${layout.scale.toFixed(3)} offset=(${layout.offsetX.toFixed(1)},${layout.offsetY.toFixed(1)}) game=${layout.gameWidth}x${layout.gameHeight} play=${layout.playHeight}`,
+    );
 
+    dynamicGameWidthRef.current = layout.gameWidth;
+    dynamicGroundHeightRef.current = layout.groundHeight;
     dynamicPlayHeightRef.current = layout.playHeight;
     dynamicBirdStartYRef.current = layout.birdStartY;
 
     // Apply scale + center (pillarbox / letterbox) to the inner wrapper
     if (scalerRef.current) {
-      scalerRef.current.setStyleProperty('width', `${GAME_WIDTH}px`);
+      scalerRef.current.setStyleProperty('width', `${layout.gameWidth}px`);
       scalerRef.current.setStyleProperty('height', `${layout.gameHeight}px`);
       scalerRef.current.setStyleProperty(
         'transform',
@@ -182,8 +206,9 @@ export function Game() {
       );
     }
 
-    // Set dynamic pipe container + pipe pair heights
+    // Set dynamic pipe container dimensions
     if (pipesContainerRef.current) {
+      pipesContainerRef.current.setStyleProperty('width', `${layout.gameWidth}px`);
       pipesContainerRef.current.setStyleProperty('height', `${layout.playHeight}px`);
     }
     for (let i = 0; i < MAX_PIPES; i++) {
@@ -192,6 +217,32 @@ export function Game() {
         ref.setStyleProperty('height', `${layout.playHeight}px`);
       }
     }
+
+    // Set dynamic ground height on strips and background offset
+    const gH = layout.groundHeight;
+    const groundEls = [ground0Ref, ground1Ref, ground2Ref];
+    for (let i = 0; i < 3; i++) {
+      if (groundEls[i]!.current) {
+        groundEls[i]!.current!.setStyleProperty('height', `${gH}px`);
+      }
+    }
+    if (bgImgRef.current) {
+      bgImgRef.current.setStyleProperty('bottom', `${gH}px`);
+    }
+
+    // Align debug overlays to dynamic ground height
+    if (debugTextRef.current) {
+      debugTextRef.current.setStyleProperty('bottom', `${gH + 4}px`);
+    }
+    if (mtsBtsLedRef.current) {
+      mtsBtsLedRef.current.setStyleProperty('bottom', `${gH + 6}px`);
+    }
+    if (btsMtsLedRef.current) {
+      btsMtsLedRef.current.setStyleProperty('bottom', `${gH + 6}px`);
+    }
+
+    // Update debug boundary lines
+    updateBoundaryLines(layout.playHeight, PIPE_GAP);
 
     // Set bird start position
     birdYRef.current = dynamicBirdStartYRef.current;
@@ -252,7 +303,7 @@ export function Game() {
 
     // Update background image + sky color
     if (bgImgRef.current) {
-      bgImgRef.current.setAttribute('src', backgrounds[bgVariantRef.current]!);
+      bgImgRef.current.setStyleProperty('background-image', `url(${backgrounds[bgVariantRef.current]!})`);
     }
     if (bgRef.current) {
       bgRef.current.setStyleProperty('background-color', bgSkyColors[bgVariantRef.current]!);
@@ -282,8 +333,10 @@ export function Game() {
   function spawnPipe(startX: number): void {
     'main thread';
     const playH = dynamicPlayHeightRef.current;
-    const minGapY = 80;
-    const maxGapY = playH - 80;
+    // Fixed 260px gap Y range, centered in play area
+    const GAP_RANGE = 260;
+    const minGapY = Math.round((playH - GAP_RANGE) / 2);
+    const maxGapY = Math.round((playH + GAP_RANGE) / 2);
     const gapY = minGapY + Math.random() * (maxGapY - minGapY);
 
     const idx = pipeCountRef.current;
@@ -303,6 +356,7 @@ export function Game() {
     birdRotationRef.current = 0;
     ground0XRef.current = 0;
     ground1XRef.current = GROUND_WIDTH;
+    ground2XRef.current = GROUND_WIDTH * 2;
     scoreRef.current = 0;
     pipeCountRef.current = 0;
     pipesXRef.current = [];
@@ -322,7 +376,7 @@ export function Game() {
     for (let i = 0; i < MAX_PIPES; i++) {
       const ref = getPipeRef(i);
       if (ref) {
-        ref.setStyleProperty('left', `${GAME_WIDTH + 100}px`);
+        ref.setStyleProperty('left', `${dynamicGameWidthRef.current + 100}px`);
       }
     }
 
@@ -332,6 +386,9 @@ export function Game() {
     }
     if (ground1Ref.current) {
       ground1Ref.current.setStyleProperty('left', `${GROUND_WIDTH}px`);
+    }
+    if (ground2Ref.current) {
+      ground2Ref.current.setStyleProperty('left', `${GROUND_WIDTH * 2}px`);
     }
 
     // Randomize bird color and background on each restart
@@ -370,7 +427,7 @@ export function Game() {
     for (let i = pipeCountRef.current; i < MAX_PIPES; i++) {
       const ref = getPipeRef(i);
       if (ref) {
-        ref.setStyleProperty('left', `${GAME_WIDTH + 100}px`);
+        ref.setStyleProperty('left', `${dynamicGameWidthRef.current + 100}px`);
       }
     }
   }
@@ -465,12 +522,13 @@ export function Game() {
     }
 
     // Spawn new pipes
+    const gameW = dynamicGameWidthRef.current;
     if (pipeCountRef.current === 0) {
-      spawnPipe(GAME_WIDTH);
+      spawnPipe(gameW);
     } else {
       const lastPipeX = pipesXRef.current[pipeCountRef.current - 1]!;
-      if (lastPipeX < GAME_WIDTH - PIPE_SPACING) {
-        spawnPipe(GAME_WIDTH);
+      if (lastPipeX < gameW - PIPE_SPACING) {
+        spawnPipe(gameW);
       }
     }
 
@@ -499,20 +557,22 @@ export function Game() {
     // Update pipe visuals
     updatePipeVisuals();
 
-    // Ground scroll — two independent strips that wrap around
-    ground0XRef.current -= PIPE_SPEED * dtScale;
-    ground1XRef.current -= PIPE_SPEED * dtScale;
-    if (ground0XRef.current <= -GROUND_WIDTH) {
-      ground0XRef.current = ground1XRef.current + GROUND_WIDTH;
-    }
-    if (ground1XRef.current <= -GROUND_WIDTH) {
-      ground1XRef.current = ground0XRef.current + GROUND_WIDTH;
-    }
-    if (ground0Ref.current) {
-      ground0Ref.current.setStyleProperty('left', `${ground0XRef.current}px`);
-    }
-    if (ground1Ref.current) {
-      ground1Ref.current.setStyleProperty('left', `${ground1XRef.current}px`);
+    // Ground scroll — three strips that wrap around (3 needed for wider screens)
+    const groundRefs = [ground0XRef, ground1XRef, ground2XRef];
+    const groundEls = [ground0Ref, ground1Ref, ground2Ref];
+    for (let i = 0; i < 3; i++) {
+      groundRefs[i]!.current -= PIPE_SPEED * dtScale;
+      if (groundRefs[i]!.current <= -GROUND_WIDTH) {
+        // Find the rightmost strip and place after it
+        let maxX = -Infinity;
+        for (let j = 0; j < 3; j++) {
+          if (j !== i && groundRefs[j]!.current > maxX) maxX = groundRefs[j]!.current;
+        }
+        groundRefs[i]!.current = maxX + GROUND_WIDTH;
+      }
+      if (groundEls[i]!.current) {
+        groundEls[i]!.current!.setStyleProperty('left', `${groundRefs[i]!.current}px`);
+      }
     }
 
     // Collision check
@@ -657,11 +717,15 @@ export function Game() {
   // ===== Render =====
 
   return (
-    <view className="game-container">
+    <view className="game-container" main-thread:ref={containerRef}>
       <view className="game-scaler" main-thread:ref={scalerRef}>
         {/* Background */}
         <view className="background" main-thread:ref={bgRef}>
-          <image src={backgroundDay} className="background-img" main-thread:ref={bgImgRef} />
+          <view
+            className="background-img"
+            main-thread:ref={bgImgRef}
+            style={{ backgroundImage: `url(${backgroundDay})` }}
+          />
         </view>
 
         {/* Pipes */}
@@ -677,6 +741,9 @@ export function Game() {
           <image src={base} className="ground-img" />
         </view>
         <view className="ground-strip" main-thread:ref={ground1Ref} style={{ left: `${GROUND_WIDTH}px` }}>
+          <image src={base} className="ground-img" />
+        </view>
+        <view className="ground-strip" main-thread:ref={ground2Ref} style={{ left: `${GROUND_WIDTH * 2}px` }}>
           <image src={base} className="ground-img" />
         </view>
 
@@ -726,6 +793,9 @@ export function Game() {
         {/* MTS↔BTS communication LEDs */}
         <view className="debug-led debug-led-mts" main-thread:ref={mtsBtsLedRef} style={{ display: 'none' }} />
         <view className="debug-led debug-led-bts" main-thread:ref={btsMtsLedRef} style={{ display: 'none' }} />
+        {/* Pipe spawn boundary lines */}
+        <view className="debug-boundary" main-thread:ref={boundaryTopRef} style={{ display: 'none' }} />
+        <view className="debug-boundary" main-thread:ref={boundaryBottomRef} style={{ display: 'none' }} />
 
         {/* Touch area — must be last to sit on top of overlays */}
         {gameState !== 'gameover' && (
