@@ -7,11 +7,22 @@ export function App() {
   const modalQrRef = useRef<HTMLDivElement>(null);
   const lynxViewRef = useRef<LynxViewElement>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const bundleUrl =
+    typeof window !== 'undefined'
+      ? window.location.href.replace(/\/[^/]*$/, '/') + 'main.lynx.bundle?fullscreen=true'
+      : '';
+
+  function copyBundleUrl() {
+    navigator.clipboard.writeText(bundleUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }
 
   useEffect(() => {
     if (!qrRef.current) return;
-    const base = window.location.href.replace(/\/[^/]*$/, '/');
-    const bundleUrl = base + 'main.lynx.bundle?fullscreen=true';
     QrCreator.render(
       {
         text: bundleUrl,
@@ -30,8 +41,6 @@ export function App() {
     if (!drawerOpen || !modalQrRef.current) return;
     // Don't re-render if already has a canvas
     if (modalQrRef.current.querySelector('canvas')) return;
-    const base = window.location.href.replace(/\/[^/]*$/, '/');
-    const bundleUrl = base + 'main.lynx.bundle?fullscreen=true';
     QrCreator.render(
       {
         text: bundleUrl,
@@ -102,6 +111,10 @@ export function App() {
             >
               Lynx Explorer
             </a>
+            {' · '}
+            <a href="#" className="copy-url" onClick={(e) => { e.preventDefault(); copyBundleUrl(); }}>
+              {copied ? 'Copied!' : 'Copy URL'}
+            </a>
           </span>
         </div>
         <p className="source-link">
@@ -148,6 +161,10 @@ export function App() {
                   rel="noreferrer"
                 >
                   Lynx Explorer
+                </a>
+                {' · '}
+                <a href="#" className="copy-url" onClick={(e) => { e.preventDefault(); copyBundleUrl(); }}>
+                  {copied ? 'Copied!' : 'Copy URL'}
                 </a>
               </span>
             </div>
