@@ -63,8 +63,6 @@ const backgrounds = [backgroundDay, backgroundNight];
 const bgSkyColors = ['#4ec0ca', '#008793'];
 
 const isWeb = SystemInfo.platform === 'web';
-const isDesktopWeb = isWeb && !('ontouchstart' in globalThis);
-const pointerMode = isDesktopWeb ? 'mouse' : isWeb ? 'touch(web)' : 'touch(native)';
 
 export function Game() {
   const [gameState, setGameState] = useState<GameState>('idle');
@@ -113,6 +111,11 @@ export function Game() {
     updateDebugText, updateGapZone,
     startLongPress, endLongPress,
   } = useDebugMode();
+
+  // Guard against touch+mouse double-fire on mobile web
+  const pressedRef = useMainThreadRef(false);
+  // Track last input source for debug overlay
+  const lastPointerRef = useMainThreadRef('--');
 
   // MTS game state (not React state — these live on main thread)
   const velocityRef = useMainThreadRef(0);
@@ -295,7 +298,7 @@ export function Game() {
       pipesX: pipesXRef.current,
       pipesGapY: pipesGapYRef.current,
       score: scoreRef.current,
-      pointerMode,
+      pointerMode: lastPointerRef.current,
     };
   }
 
@@ -650,6 +653,10 @@ export function Game() {
 
   function onTouchStart(_e: MainThread.TouchEvent): void {
     'main thread';
+    // Guard: on mobile web, both touchstart and synthesized mousedown fire
+    if (pressedRef.current) return;
+    pressedRef.current = true;
+    lastPointerRef.current = (_e as any).touches ? 'touch' : 'mouse';
     startLongPress(toggleDebugMode);
     // Immediate flap during gameplay for responsiveness
     if (gameStateRef.current === 'playing') {
@@ -659,6 +666,8 @@ export function Game() {
 
   function onTouchEnd(_e: MainThread.TouchEvent): void {
     'main thread';
+    if (!pressedRef.current) return;
+    pressedRef.current = false;
     // Long press already fired — no further action
     if (endLongPress()) return;
 
@@ -804,21 +813,18 @@ export function Game() {
         <view className="debug-boundary" main-thread:ref={boundaryBottomRef} style={{ display: 'none' }} />
 
         {/* Touch area — must be last to sit on top of overlays */}
-        {/* Desktop web (no touch): mouse only.
-            Touch web + Native: touch only (mouse events have ~300ms delay on iOS Safari). */}
+        {/* Bind both touch + mouse: touch for mobile, mouse for desktop.
+            On mobile web, browser synthesizes mouse from touch causing double-fire;
+            startLongPress has a re-entry guard to handle this. */}
         {gameState !== 'gameover' && (
-          isDesktopWeb
-            ? <view
-                className="touch-area"
-                main-thread:bindmousedown={onTouchStart as any}
-                main-thread:bindmouseup={onTouchEnd as any}
-              />
-            : <view
-                className="touch-area"
-                main-thread:bindtouchstart={onTouchStart}
-                main-thread:bindtouchend={onTouchEnd}
-                main-thread:bindtouchcancel={onTouchEnd}
-              />
+          <view
+            className="touch-area"
+            main-thread:bindtouchstart={onTouchStart}
+            main-thread:bindtouchend={onTouchEnd}
+            main-thread:bindtouchcancel={onTouchEnd}
+            main-thread:bindmousedown={onTouchStart as any}
+            main-thread:bindmouseup={onTouchEnd as any}
+          />
         )}
       </view>
     </view>

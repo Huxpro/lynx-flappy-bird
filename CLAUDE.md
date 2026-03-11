@@ -74,6 +74,22 @@ If function A calls function B, B **must be declared before A** in source order 
 - **`position: absolute` is relative to root**, not nearest positioned ancestor. See [position](https://lynxjs.org/api/css/properties/position.html).
 - **Inline style lengths need units as strings.** `style={{ height: '82px' }}` not `style={{ height: 82 }}`.
 
+### Touch/Mouse Events on Web (Double-Fire Problem)
+
+**BTS runs in a Web Worker.** `globalThis` in BTS is `WorkerGlobalScope`, NOT `window`. DOM-based capability checks like `'ontouchstart' in globalThis` always return `false` in BTS, regardless of device. **Never use DOM feature detection in BTS code.**
+
+On web, we bind **both** `touchstart`/`touchend` and `mousedown`/`mouseup` on the same element so that:
+- Mobile web → responds to touch (zero-latency)
+- Desktop web → responds to mouse clicks
+
+**Double-fire on mobile web:** Browsers synthesize `mousedown`/`mouseup` from touch events. With both bound, a single tap fires `touchstart` then `mousedown`. Mitigation strategy:
+
+1. **Long press (`startLongPress`):** Re-entry guard via timer ref — if a timer is already running, skip. This prevents the synthesized `mousedown` from resetting the long-press timer.
+2. **Flap (`onTouchStart`):** `pressedRef` guard blocks the synthesized `mousedown` that arrives in the same press cycle. Even if the guard doesn't block it (e.g., after `touchend` resets the ref), `velocityRef = FLAP_IMPULSE` is an idempotent assignment — setting the same impulse value twice is visually harmless.
+3. **Game state transitions (`onTouchEnd`):** Protected by `gameStateRef` checks (e.g., `if (gameStateRef.current === 'idle')` fails on the second call because the first already changed state to `'playing'`).
+
+**Key insight:** Not all double-fires need blocking. Only side-effectful, non-idempotent operations (like starting a timer) need guards. Idempotent assignments (like setting velocity) are naturally safe.
+
 ### runOnBackground (MTS → BTS)
 - MUST be called **inline inside MTS functions**, NOT at the component level
 - Pass stable function references (e.g., React setState setters) directly
