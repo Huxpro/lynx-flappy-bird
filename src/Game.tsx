@@ -112,8 +112,9 @@ export function Game() {
     startLongPress, endLongPress,
   } = useDebugMode();
 
-  // Guard against touch+mouse double-fire on mobile web
-  const pressedRef = useMainThreadRef(false);
+  // Once a real touch event is observed, ignore all mouse events (synthesized).
+  // This self-adapts: mobile sets it on first tap, desktop never sets it.
+  const hasTouchRef = useMainThreadRef(false);
   // Track last input source for debug overlay
   const lastPointerRef = useMainThreadRef('--');
 
@@ -653,10 +654,13 @@ export function Game() {
 
   function onTouchStart(_e: MainThread.TouchEvent): void {
     'main thread';
-    // Guard: on mobile web, both touchstart and synthesized mousedown fire
-    if (pressedRef.current) return;
-    pressedRef.current = true;
-    lastPointerRef.current = (_e as any).touches ? 'touch' : 'mouse';
+    const isTouch = !!(_e as any).touches;
+    if (isTouch) {
+      hasTouchRef.current = true;
+    } else if (hasTouchRef.current) {
+      return; // Synthesized mouse on touch device — skip
+    }
+    lastPointerRef.current = isTouch ? 'touch' : 'mouse';
     startLongPress(toggleDebugMode);
     // Immediate flap during gameplay for responsiveness
     if (gameStateRef.current === 'playing') {
@@ -666,8 +670,8 @@ export function Game() {
 
   function onTouchEnd(_e: MainThread.TouchEvent): void {
     'main thread';
-    if (!pressedRef.current) return;
-    pressedRef.current = false;
+    const isTouch = !!(_e as any).touches;
+    if (!isTouch && hasTouchRef.current) return;
     // Long press already fired — no further action
     if (endLongPress()) return;
 
