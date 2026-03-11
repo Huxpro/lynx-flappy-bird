@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lynx Flappy Bird</title>
+  <meta name="description" content="A cross-platform Flappy Bird vibe-coded with ReactLynx. Play in the browser or natively on mobile — same codebase, same feel.">
+  <meta property="og:title" content="Lynx Flappy Bird">
+  <meta property="og:description" content="A cross-platform Flappy Bird built with ReactLynx. Play it in a web browser or render it natively on mobile.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Lynx Flappy Bird">
+  <meta name="twitter:description" content="Flappy Bird vibe-coded with ReactLynx — cross-platform, native-grade performance.">
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="stylesheet" href="https://unpkg.com/@lynx-js/web-core@0.19.8/index.css">
+  <link rel="stylesheet" href="https://unpkg.com/@lynx-js/web-elements@0.12.0/index.css">
+  <script type="module" src="https://unpkg.com/@lynx-js/web-core@0.19.8/dist/index.js"></script>
+  <script type="module" src="https://unpkg.com/@lynx-js/web-elements@0.12.0/dist/elements/all.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #f0f2f5;
+      color: #1a1a2e;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .container {
+      display: flex;
+      align-items: center;
+      gap: 48px;
+      padding: 32px;
+      max-width: 1100px;
+    }
+
+    /* Game panel */
+    .game-panel {
+      flex-shrink: 0;
+    }
+
+    .phone-frame {
+      width: 390px;
+      height: 844px;
+      border-radius: 40px;
+      overflow: hidden;
+      box-shadow:
+        0 0 0 8px #1a1a2e,
+        0 20px 60px rgba(0, 0, 0, 0.3);
+      background: #000;
+    }
+
+    .phone-frame lynx-view {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Info panel */
+    .info-panel {
+      max-width: 360px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .info-panel h1 {
+      font-size: 28px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .info-panel p {
+      font-size: 15px;
+      line-height: 1.6;
+      color: #444;
+    }
+
+    .info-panel a {
+      color: #0969da;
+      text-decoration: none;
+    }
+
+    .info-panel a:hover {
+      text-decoration: underline;
+    }
+
+    .qr-section {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    }
+
+    .qr-section canvas, .qr-section svg {
+      border-radius: 4px;
+    }
+
+    .qr-section .qr-label {
+      font-size: 13px;
+      color: #666;
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    .qr-section .qr-label a {
+      font-weight: 500;
+    }
+
+    .tech-badges {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      background: #e8f0fe;
+      color: #1a73e8;
+    }
+
+    /* Responsive: stack on narrow screens */
+    @media (max-width: 900px) {
+      body { padding: 16px; }
+
+      .container {
+        flex-direction: column;
+        gap: 32px;
+        padding: 16px;
+      }
+
+      .phone-frame {
+        width: min(100%, 390px);
+        height: auto;
+        aspect-ratio: 390 / 844;
+        border-radius: 24px;
+        box-shadow:
+          0 0 0 5px #1a1a2e,
+          0 12px 40px rgba(0, 0, 0, 0.25);
+      }
+
+      .info-panel {
+        max-width: 100%;
+        align-items: center;
+        text-align: center;
+      }
+
+      .tech-badges {
+        justify-content: center;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="game-panel">
+      <div class="phone-frame">
+        <lynx-view id="lynx-view" url="./main.web.bundle"></lynx-view>
+      </div>
+    </div>
+    <div class="info-panel">
+      <h1>Lynx Flappy Bird</h1>
+      <p>
+        A cross-platform Flappy Bird vibe-coded with
+        <a href="https://lynxjs.org/" target="_blank">ReactLynx</a>.
+        The game loop and touch handling run on the main thread for native-grade
+        responsiveness — React only manages the UI shell.
+      </p>
+      <div class="tech-badges">
+        <span class="badge">ReactLynx</span>
+        <span class="badge">Main Thread Script</span>
+        <span class="badge">Cross-Platform</span>
+      </div>
+      <div class="qr-section">
+        <div id="qr-container"></div>
+        <div class="qr-label">
+          Scan with <a href="https://lynxjs.org/guide/start/quick-start.html#prepare-lynx-explorer" target="_blank">Lynx Explorer</a> to play natively on mobile
+        </div>
+      </div>
+      <p>
+        <a href="https://github.com/Huxpro/lynx-flappy-bird" target="_blank">View source on GitHub</a>
+      </p>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/qr-creator@1.0.0/dist/qr-creator.min.js"></script>
+  <script>
+    var base = window.location.href.replace(/\/[^/]*$/, '/');
+    var bundleUrl = base + 'main.lynx.bundle';
+    QrCreator.render({
+      text: bundleUrl,
+      radius: 0.0,
+      ecLevel: 'M',
+      fill: '#1a1a2e',
+      background: '#ffffff',
+      size: 160,
+    }, document.getElementById('qr-container'));
+  </script>
+</body>
+</html>

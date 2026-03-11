@@ -11,6 +11,9 @@ export default defineConfig({
       },
     }),
   ],
+  output: {
+    copy: [{ from: './public', to: '.' }],
+  },
   environments: {
     web: {},
     lynx: {},

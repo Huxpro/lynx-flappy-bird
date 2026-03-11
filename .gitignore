@@ -2,3 +2,4 @@ node_modules/
 dist/
 .context/
 tsconfig.tsbuildinfo
+*.hot-update.*
