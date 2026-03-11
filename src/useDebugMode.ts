@@ -11,6 +11,7 @@ export interface DebugSnapshot {
   pipesX: number[];
   pipesGapY: number[];
   score: number;
+  pointerMode: string;
 }
 
 export function useDebugMode() {
@@ -134,6 +135,7 @@ export function useDebugMode() {
       `pipe: ${pipeInfo}  n:${snap.pipeCount}`,
       `score: ${snap.score}`,
       `mts→bts: ${mtsBtsCountRef.current}  bts→mts: ${btsMtsCountRef.current}`,
+      `ptr: ${snap.pointerMode}`,
     ];
     debugTextRef.current.setAttribute('text', lines.join('\n'));
   }

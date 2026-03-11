@@ -62,6 +62,10 @@ const backgrounds = [backgroundDay, backgroundNight];
 // Sky colors matching the top of each background image (for the gap above the sprite)
 const bgSkyColors = ['#4ec0ca', '#008793'];
 
+const isWeb = SystemInfo.platform === 'web';
+const isDesktopWeb = isWeb && !('ontouchstart' in globalThis);
+const pointerMode = isDesktopWeb ? 'mouse' : isWeb ? 'touch(web)' : 'touch(native)';
+
 export function Game() {
   const [gameState, setGameState] = useState<GameState>('idle');
   const [score, setScore] = useState(10); // TODO: reset to 0 after testing
@@ -293,6 +297,7 @@ export function Game() {
       pipesX: pipesXRef.current,
       pipesGapY: pipesGapYRef.current,
       score: scoreRef.current,
+      pointerMode,
     };
   }
 
@@ -815,7 +820,7 @@ export function Game() {
         {/* Desktop web (no touch): mouse only.
             Touch web + Native: touch only (mouse events have ~300ms delay on iOS Safari). */}
         {gameState !== 'gameover' && (
-          SystemInfo.platform === 'web' && !('ontouchstart' in globalThis)
+          isDesktopWeb
             ? <view
                 className="touch-area"
                 main-thread:bindmousedown={onTouchStart as any}
