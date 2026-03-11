@@ -122,28 +122,34 @@ body::after {
   color: var(--green);
 }
 
-.qr-section {
+/* -- QR card (vertical, slim) -- */
+.qr-card {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 16px;
+  gap: 10px;
+  padding: 20px 24px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(74, 222, 128, 0.1);
+  background: linear-gradient(
+    168deg,
+    rgba(26, 30, 40, 0.8) 0%,
+    rgba(12, 14, 20, 0.6) 100%
+  );
   animation: fadeIn 0.5s ease-out 0.3s both;
 }
 
-.qr-section canvas, .qr-section svg {
-  border-radius: 4px;
-  flex-shrink: 0;
-}
-
-.qr-text {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+.qr-canvas canvas,
+.qr-canvas svg {
+  border-radius: 6px;
+  display: block;
 }
 
 .qr-label {
   font-size: 13px;
   font-weight: 500;
   color: var(--text);
+  margin-top: 2px;
 }
 
 .qr-hint {
@@ -152,12 +158,32 @@ body::after {
   line-height: 1.5;
 }
 
+.qr-hint a {
+  color: var(--blue);
+  text-decoration: none;
+  font-weight: 400;
+  transition: color 0.2s;
+}
+.qr-hint a:hover {
+  color: var(--green);
+}
+
 .source-link {
   animation: fadeIn 0.5s ease-out 0.4s both;
   font-size: 14px;
 }
 
-/* -- Small screen: fullscreen game, hide info -- */
+/* -- Mobile info button -- */
+.mobile-info-btn {
+  display: none;
+}
+
+/* -- Drawer -- */
+.drawer-backdrop {
+  display: none;
+}
+
+/* -- Small screen: fullscreen game, hide info, show mobile button -- */
 @media (max-width: 768px) {
   body {
     padding: 0;
@@ -185,5 +211,133 @@ body::after {
     border: none;
     border-radius: 0;
     box-shadow: none;
+  }
+
+  /* Floating info button */
+  .mobile-info-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    z-index: 90;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid rgba(74, 222, 128, 0.25);
+    background: rgba(12, 14, 20, 0.7);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s;
+    padding: 0;
+  }
+  .mobile-info-btn:active {
+    color: #fff;
+    border-color: var(--green);
+  }
+
+  /* Drawer backdrop + panel */
+  .drawer-backdrop {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    animation: backdropIn 0.2s ease-out;
+  }
+
+  @keyframes backdropIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .drawer {
+    position: relative;
+    width: 100%;
+    max-width: 420px;
+    max-height: 85vh;
+    overflow-y: auto;
+    background: linear-gradient(180deg, #1a1e28 0%, #0c0e14 100%);
+    border-top: 1px solid rgba(74, 222, 128, 0.12);
+    border-radius: 20px 20px 0 0;
+    padding: 28px 24px calc(env(safe-area-inset-bottom, 20px) + 24px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    animation: drawerSlide 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @keyframes drawerSlide {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+  .drawer-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    padding: 4px;
+    line-height: 0;
+    transition: color 0.2s;
+  }
+  .drawer-close:active {
+    color: var(--text);
+  }
+
+  .drawer-qr-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 20px 24px 16px;
+    border-radius: 12px;
+    border: 1px solid rgba(74, 222, 128, 0.1);
+    background: rgba(26, 30, 40, 0.5);
+    width: 100%;
+  }
+
+  .drawer-divider {
+    width: 40px;
+    height: 1px;
+    background: rgba(74, 222, 128, 0.12);
+  }
+
+  .drawer-desc {
+    font-size: 14px;
+    font-weight: 300;
+    line-height: 1.7;
+    color: var(--text-dim);
+    text-align: center;
+  }
+  .drawer-desc a {
+    color: var(--blue);
+    text-decoration: none;
+    font-weight: 400;
+  }
+
+  .drawer-title {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 11px;
+    color: var(--green);
+    letter-spacing: 0.5px;
+  }
+
+  .drawer-source {
+    font-size: 13px;
+    color: var(--blue);
+    text-decoration: none;
+    font-weight: 400;
   }
 }

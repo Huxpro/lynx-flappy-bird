@@ -66,6 +66,7 @@ export function Game() {
   const [gameState, setGameState] = useState<GameState>('idle');
   const [score, setScore] = useState(10); // TODO: reset to 0 after testing
   const [bestScore, setBestScore] = useState(10); // TODO: reset to 0 after testing
+  const [groundHeight, setGroundHeight] = useState(112);
 
   // Current variant index (randomized on each game start)
   const birdVariantRef = useMainThreadRef(0);
@@ -235,6 +236,9 @@ export function Game() {
     if (bgImgRef.current) {
       bgImgRef.current.setStyleProperty('bottom', `${gH}px`);
     }
+
+    // Sync ground height to BTS for conditional UI positioning
+    runOnBackground(setGroundHeight)(gH);
 
     // Align debug overlays to dynamic ground height
     if (debugTextRef.current) {
@@ -784,7 +788,7 @@ export function Game() {
 
         {/* Debug hint — shown in idle when debug mode is off */}
         {gameState === 'idle' && !debugMode && (
-          <text className="debug-text">long press for debug mode</text>
+          <text className="debug-text" style={{ bottom: `${groundHeight + 4}px` }}>long press for debug mode</text>
         )}
 
         {/* Game over screen */}
