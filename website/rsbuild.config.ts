@@ -51,7 +51,7 @@ export default defineConfig({
   },
 
   output: {
-    assetPrefix: '/lynx-flappy-bird/',
+    assetPrefix: process.env.VERCEL ? '/' : '/lynx-flappy-bird/',
     copy: [
       { from: '../dist/main.web.bundle', to: '.', noErrorOnMissing: true },
       { from: '../dist/main.lynx.bundle', to: '.', noErrorOnMissing: true },
