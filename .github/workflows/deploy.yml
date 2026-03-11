@@ -29,6 +29,8 @@ jobs:
 
       - run: npm install
 
+      - run: cd website && npm install
+
       - run: npm run build:website
 
       - uses: actions/configure-pages@v5
