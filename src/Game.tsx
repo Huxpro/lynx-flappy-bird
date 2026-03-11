@@ -830,6 +830,7 @@ export function Game() {
                 className="touch-area"
                 main-thread:bindtouchstart={onTouchStart}
                 main-thread:bindtouchend={onTouchEnd}
+                main-thread:bindtouchcancel={onTouchEnd}
               />
         )}
       </view>

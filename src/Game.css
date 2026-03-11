@@ -244,4 +244,8 @@
   height: 100%;
   top: 0;
   left: 0;
+  /* Prevent browser native long-press (context menu / text selection) on mobile web */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
