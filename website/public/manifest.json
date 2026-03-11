@@ -1,0 +1,20 @@
+{
+  "name": "Lynx Flappy Bird",
+  "short_name": "Flappy Bird",
+  "start_url": "/lynx-flappy-bird/",
+  "display": "standalone",
+  "background_color": "#4ec0ca",
+  "theme_color": "#0c0e14",
+  "icons": [
+    {
+      "src": "/lynx-flappy-bird/app-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/lynx-flappy-bird/app-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

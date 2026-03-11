@@ -85,6 +85,10 @@ body::after {
   background: #000;
   border: var(--frame-border) solid var(--bezel);
   box-shadow: 0 6px 28px rgba(0, 0, 0, 0.5);
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 /* -- Info panel -- */

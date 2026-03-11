@@ -27,6 +27,10 @@ export default defineConfig({
         'Flappy Bird vibe-coded with ReactLynx — cross-platform, native-grade performance.',
     },
     tags: [
+      { tag: 'link', attrs: { rel: 'manifest', href: '/lynx-flappy-bird/manifest.json' } },
+      { tag: 'meta', attrs: { name: 'apple-mobile-web-app-capable', content: 'yes' } },
+      { tag: 'meta', attrs: { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' } },
+      { tag: 'link', attrs: { rel: 'apple-touch-icon', href: '/lynx-flappy-bird/app-icon-192.png' } },
       { tag: 'link', attrs: { rel: 'preconnect', href: 'https://fonts.googleapis.com' } },
       {
         tag: 'link',
@@ -43,7 +47,7 @@ export default defineConfig({
   },
 
   server: {
-    publicDir: [{ name: '../dist', watch: true }],
+    publicDir: [{ name: '../dist', watch: true }, { name: 'public' }],
   },
 
   output: {
@@ -52,6 +56,8 @@ export default defineConfig({
       { from: '../dist/main.web.bundle', to: '.', noErrorOnMissing: true },
       { from: '../dist/main.lynx.bundle', to: '.', noErrorOnMissing: true },
       { from: '../dist/static', to: 'static', noErrorOnMissing: true },
+      { from: '../public/app-icon-192.png', to: '.' },
+      { from: '../public/app-icon-512.png', to: '.' },
     ],
   },
 });
