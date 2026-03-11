@@ -27,10 +27,10 @@ export default defineConfig({
         'Flappy Bird vibe-coded with ReactLynx — cross-platform, native-grade performance.',
     },
     tags: [
-      { tag: 'link', attrs: { rel: 'manifest', href: '/lynx-flappy-bird/manifest.json' } },
+      { tag: 'link', attrs: { rel: 'manifest', href: 'manifest.json' } },
       { tag: 'meta', attrs: { name: 'apple-mobile-web-app-capable', content: 'yes' } },
       { tag: 'meta', attrs: { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' } },
-      { tag: 'link', attrs: { rel: 'apple-touch-icon', href: '/lynx-flappy-bird/app-icon-192.png' } },
+      { tag: 'link', attrs: { rel: 'apple-touch-icon', href: 'app-icon-192.png' } },
       { tag: 'link', attrs: { rel: 'preconnect', href: 'https://fonts.googleapis.com' } },
       {
         tag: 'link',
