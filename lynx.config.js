@@ -12,7 +12,11 @@ export default defineConfig({
     }),
   ],
   environments: {
-    web: {},
+    web: {
+      output: {
+        assetPrefix: 'https://huangxuan.me/lynx-flappy-bird/',
+      },
+    },
     lynx: {},
   },
 });
