@@ -77,8 +77,8 @@ export function useStressTest() {
         container.setStyleProperty('transform', `rotate(${rotation}deg)`);
       }
       if (img) {
-        // Each variant ×2: shadow 0,1 = variant 0; 2,3 = variant 1; etc.
-        const variant = Math.floor(i / 2) % 4;
+        // Each variant ×2, classic birds only (skip lynx — different size)
+        const variant = Math.floor(i / 2) % 3;
         const frames = allBirdFrames[variant]!;
         img.setAttribute('src', frames[wingFrame]!);
       }

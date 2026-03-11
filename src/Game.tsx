@@ -838,7 +838,7 @@ export function Game() {
             style={{ display: 'none', left: `${SHADOW_X[i]}px` }}
           >
             <image
-              src={allBirdFrames[Math.floor(i / 2) % 4]![0]!}
+              src={allBirdFrames[Math.floor(i / 2) % 3]![0]!}
               className="bird-img"
               main-thread:ref={shadowImgRefs[i]}
             />
