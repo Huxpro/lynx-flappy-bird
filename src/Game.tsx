@@ -118,9 +118,7 @@ export function Game() {
   const velocityRef = useMainThreadRef(0);
   const birdYRef = useMainThreadRef(200);
   const birdRotationRef = useMainThreadRef(0);
-  const ground0XRef = useMainThreadRef(0);
-  const ground1XRef = useMainThreadRef(GROUND_WIDTH);
-  const ground2XRef = useMainThreadRef(GROUND_WIDTH * 2);
+  const groundOffsetRef = useMainThreadRef(0);
   const gameStateRef = useMainThreadRef<'idle' | 'playing' | 'gameover'>('idle');
   const scoreRef = useMainThreadRef(10); // TODO: reset to 0 after testing
   const lastTimeRef = useMainThreadRef(0);
@@ -369,9 +367,7 @@ export function Game() {
     velocityRef.current = 0;
     birdYRef.current = birdStartY;
     birdRotationRef.current = 0;
-    ground0XRef.current = 0;
-    ground1XRef.current = GROUND_WIDTH;
-    ground2XRef.current = GROUND_WIDTH * 2;
+    groundOffsetRef.current = 0;
     scoreRef.current = 0;
     pipeCountRef.current = 0;
     pipesXRef.current = [];
@@ -396,14 +392,11 @@ export function Game() {
     }
 
     // Reset ground
-    if (ground0Ref.current) {
-      ground0Ref.current.setStyleProperty('left', '0px');
-    }
-    if (ground1Ref.current) {
-      ground1Ref.current.setStyleProperty('left', `${GROUND_WIDTH}px`);
-    }
-    if (ground2Ref.current) {
-      ground2Ref.current.setStyleProperty('left', `${GROUND_WIDTH * 2}px`);
+    const groundEls = [ground0Ref, ground1Ref, ground2Ref];
+    for (let i = 0; i < 3; i++) {
+      if (groundEls[i]!.current) {
+        groundEls[i]!.current!.setStyleProperty('left', `${i * GROUND_WIDTH}px`);
+      }
     }
 
     // Randomize bird color and background on each restart
@@ -572,21 +565,15 @@ export function Game() {
     // Update pipe visuals
     updatePipeVisuals();
 
-    // Ground scroll — three strips that wrap around (3 needed for wider screens)
-    const groundRefs = [ground0XRef, ground1XRef, ground2XRef];
+    // Ground scroll — single offset drives all three strips (no float drift between them)
+    groundOffsetRef.current -= PIPE_SPEED * dtScale;
+    if (groundOffsetRef.current <= -GROUND_WIDTH) {
+      groundOffsetRef.current += GROUND_WIDTH;
+    }
     const groundEls = [ground0Ref, ground1Ref, ground2Ref];
     for (let i = 0; i < 3; i++) {
-      groundRefs[i]!.current -= PIPE_SPEED * dtScale;
-      if (groundRefs[i]!.current <= -GROUND_WIDTH) {
-        // Find the rightmost strip and place after it
-        let maxX = -Infinity;
-        for (let j = 0; j < 3; j++) {
-          if (j !== i && groundRefs[j]!.current > maxX) maxX = groundRefs[j]!.current;
-        }
-        groundRefs[i]!.current = maxX + GROUND_WIDTH;
-      }
       if (groundEls[i]!.current) {
-        groundEls[i]!.current!.setStyleProperty('left', `${groundRefs[i]!.current}px`);
+        groundEls[i]!.current!.setStyleProperty('left', `${groundOffsetRef.current + i * GROUND_WIDTH}px`);
       }
     }
 
