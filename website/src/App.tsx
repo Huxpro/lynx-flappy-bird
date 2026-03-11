@@ -1,8 +1,10 @@
 import { useEffect, useRef } from 'react';
 import QrCreator from 'qr-creator';
+import type { LynxViewElement } from './env.js';
 
 export function App() {
   const qrRef = useRef<HTMLDivElement>(null);
+  const lynxViewRef = useRef<LynxViewElement>(null);
 
   useEffect(() => {
     if (!qrRef.current) return;
@@ -21,11 +23,25 @@ export function App() {
     );
   }, []);
 
+  useEffect(() => {
+    const el = lynxViewRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect;
+      if (width > 0 && height > 0) {
+        el.sendGlobalEvent('onWindowResize', [width, height]);
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   return (
     <div className="container">
       <div className="game-panel">
         <div className="phone-frame">
           <lynx-view
+            ref={lynxViewRef}
             style={{ display: 'block', width: '100%', height: '100%' }}
             url="./main.web.bundle"
           />

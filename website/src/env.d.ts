@@ -1,13 +1,19 @@
 /// <reference types="@rsbuild/core/types" />
 
-declare namespace JSX {
-  interface IntrinsicElements {
-    'lynx-view': React.DetailedHTMLProps<
-      React.HTMLAttributes<HTMLElement> & {
-        url?: string;
-      },
-      HTMLElement
-    >;
+export interface LynxViewElement extends HTMLElement {
+  sendGlobalEvent(event: string, params: unknown[]): void;
+}
+
+declare global {
+  namespace JSX {
+    interface IntrinsicElements {
+      'lynx-view': React.DetailedHTMLProps<
+        React.HTMLAttributes<LynxViewElement> & {
+          url?: string;
+        },
+        LynxViewElement
+      >;
+    }
   }
 }
 

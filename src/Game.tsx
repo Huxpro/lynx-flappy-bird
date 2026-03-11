@@ -123,6 +123,10 @@ export function Game() {
   const wingTimerRef = useMainThreadRef(0);
   const idleTimeRef = useMainThreadRef(0);
 
+  // Override dimensions sent from the website's ResizeObserver
+  const overrideWRef = useMainThreadRef(0);
+  const overrideHRef = useMainThreadRef(0);
+
   // Dynamic dimensions (computed once at init from screen size)
   const dynamicGameWidthRef = useMainThreadRef(GAME_WIDTH);
   const dynamicGroundHeightRef = useMainThreadRef(112);
@@ -176,15 +180,17 @@ export function Game() {
     // lynx-view container instead of the browser viewport.
     // On native, clientWidth/clientHeight aren't available, so fall back to SystemInfo
     // (which correctly reflects the LynxView dimensions on native).
+    const overW = overrideWRef.current;
+    const overH = overrideHRef.current;
     const el = containerRef.current as any;
     const elW = el?.clientWidth;
     const elH = el?.clientHeight;
     const sysW = SystemInfo.pixelWidth / SystemInfo.pixelRatio;
     const sysH = SystemInfo.pixelHeight / SystemInfo.pixelRatio;
-    const cssWidth = (elW > 0) ? elW : sysW;
-    const cssHeight = (elH > 0) ? elH : sysH;
+    const cssWidth = (overW > 0) ? overW : (elW > 0) ? elW : sysW;
+    const cssHeight = (overH > 0) ? overH : (elH > 0) ? elH : sysH;
     console.log(
-      `[applyLayout] el=${elW}x${elH} sys=${sysW}x${sysH} → used=${cssWidth}x${cssHeight}`,
+      `[applyLayout] override=${overW}x${overH} el=${elW}x${elH} sys=${sysW}x${sysH} → used=${cssWidth}x${cssHeight}`,
     );
     const layout = computeLayout(cssWidth, cssHeight);
     console.log(
@@ -705,13 +711,17 @@ export function Game() {
   }, []);
 
   // Re-apply layout on screen rotation / resize
-  useLynxGlobalEventListener('onWindowResize', () => {
-    console.log('[FlappyBird] onWindowResize triggered');
-    void runOnMainThread(() => {
+  useLynxGlobalEventListener('onWindowResize', (width?: number, height?: number) => {
+    console.log(`[FlappyBird] onWindowResize triggered: ${width}x${height}`);
+    const w = width ?? 0;
+    const h = height ?? 0;
+    void runOnMainThread((ow: number, oh: number) => {
       'main thread';
+      overrideWRef.current = ow;
+      overrideHRef.current = oh;
       flashBtsToMts();
       applyLayout();
-    })();
+    })(w, h);
   });
 
   // ===== Render =====
