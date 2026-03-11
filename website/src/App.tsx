@@ -11,7 +11,7 @@ export function App() {
   useEffect(() => {
     if (!qrRef.current) return;
     const base = window.location.href.replace(/\/[^/]*$/, '/');
-    const bundleUrl = base + 'main.lynx.bundle';
+    const bundleUrl = base + 'main.lynx.bundle?fullscreen=true';
     QrCreator.render(
       {
         text: bundleUrl,
@@ -31,7 +31,7 @@ export function App() {
     // Don't re-render if already has a canvas
     if (modalQrRef.current.querySelector('canvas')) return;
     const base = window.location.href.replace(/\/[^/]*$/, '/');
-    const bundleUrl = base + 'main.lynx.bundle';
+    const bundleUrl = base + 'main.lynx.bundle?fullscreen=true';
     QrCreator.render(
       {
         text: bundleUrl,
@@ -106,7 +106,7 @@ export function App() {
         </div>
         <p className="source-link">
           <a
-            href="https://huxpro.github.io/lynx-flappy-bird"
+            href="https://github.com/Huxpro/lynx-flappy-bird"
             target="_blank"
             rel="noreferrer"
           >
@@ -173,7 +173,7 @@ export function App() {
             </p>
             <a
               className="drawer-source"
-              href="https://huxpro.github.io/lynx-flappy-bird"
+              href="https://github.com/Huxpro/lynx-flappy-bird"
               target="_blank"
               rel="noreferrer"
             >
