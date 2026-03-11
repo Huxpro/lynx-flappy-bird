@@ -7,18 +7,16 @@ import type { MainThread } from '@lynx-js/types';
 // All refs, positions, and loop bounds derive from it.
 export const SHADOW_BIRD_COUNT = 8;
 
-// Compute shadow bird X positions: half left of main bird (x=60), half right
+// Compute shadow bird X positions: evenly spaced across game width.
+// Overlap with main bird (x=60) is fine — shadows are translucent
+// and the real bird renders on top.
 function computeShadowPositions(count: number): number[] {
+  const GAME_W = 288;
+  const BIRD_W = 34;
+  const step = (GAME_W - BIRD_W) / (count - 1 || 1);
   const positions: number[] = [];
-  const half = Math.ceil(count / 2);
-  const rest = count - half;
-  // Left side: spread from 0 to ~52 (just before main bird at x=60)
-  for (let i = 0; i < half; i++) {
-    positions.push(Math.round((i / half) * 52));
-  }
-  // Right side: spread from 80 to ~210
-  for (let i = 0; i < rest; i++) {
-    positions.push(80 + Math.round((i / Math.max(rest - 1, 1)) * 130));
+  for (let i = 0; i < count; i++) {
+    positions.push(Math.round(step * i));
   }
   return positions;
 }
