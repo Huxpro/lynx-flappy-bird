@@ -3,11 +3,11 @@ import { runOnBackground } from '@lynx-js/react';
 import type { MainThread } from '@lynx-js/types';
 
 // ===== Configuration =====
-// Change this one constant to adjust the number of shadow birds.
-// All refs, positions, and loop bounds derive from it.
-export const SHADOW_BIRD_COUNT = 32;
+// Total shadow bird elements (all allocated upfront; L4 shows all, L1-L3 show BASE count)
+export const SHADOW_BIRD_COUNT = 96;
+export const BASE_BIRD_COUNT = 32;
 
-// L3 cross-thread flood: N calls per frame, each with padded payload
+// L3+ cross-thread flood: N calls per frame, each with padded payload
 const FLOOD_CALLS_PER_FRAME = 10;
 const PAYLOAD_PAD = 'x'.repeat(1024); // 1KB padding per call
 
@@ -31,7 +31,7 @@ export function useStressTest() {
   const stressLevelRef = useMainThreadRef(0);
   const hueRef = useMainThreadRef(0);
 
-  // BTS state for L3 cross-thread flood target
+  // BTS state for L3+ cross-thread flood target
   const [, setStressPayload] = useState<unknown>(null);
 
   // Shadow bird refs — constant loop count ensures deterministic hook ordering
@@ -44,32 +44,25 @@ export function useStressTest() {
     shadowImgRefs.push(useMainThreadRef<MainThread.Element>(null));
   }
 
-  // Stress button group: container + 3 individual button refs for highlight
-  const stressGroupRef = useMainThreadRef<MainThread.Element>(null);
-  const stressBtnRefs: { current: MainThread.Element | null }[] = [];
-  for (let i = 0; i < 3; i++) {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    stressBtnRefs.push(useMainThreadRef<MainThread.Element>(null));
-  }
-
   // ===== MTS helpers (callee-before-caller order) =====
 
-  // Show/hide all shadow birds (called on stress level transitions)
-  function showShadowBirds(visible: boolean): void {
+  // Show/hide shadow birds — count-aware for L4 (all) vs L1-L3 (base)
+  function showShadowBirds(visible: boolean, count: number): void {
     'main thread';
     for (let i = 0; i < SHADOW_BIRD_COUNT; i++) {
       const ref = shadowRefs[i]?.current;
       if (ref) {
-        ref.setStyleProperty('display', visible ? 'flex' : 'none');
-        // Reset opacity to CSS default when re-showing (L2+ flicker may have changed it)
-        if (visible) ref.setStyleProperty('opacity', '0.5');
+        const show = visible && i < count;
+        ref.setStyleProperty('display', show ? 'flex' : 'none');
+        // Reset opacity when showing (L2+ flicker may have changed it)
+        if (show) ref.setStyleProperty('opacity', '0.5');
       }
     }
   }
 
-  // L1: Update shadow birds to match main bird state
-  // N birds × (2 setStyleProperty + 1 setAttribute) MTS ops per frame
-  // L2+: extra style mutations per bird (opacity flicker) for more pressure
+  // L1+: Update shadow birds to match main bird state
+  // L4 updates all SHADOW_BIRD_COUNT; L1-L3 update BASE_BIRD_COUNT
+  // L2+: extra opacity flicker per bird for more pressure
   function updateShadowBirds(
     birdY: number,
     rotation: number,
@@ -79,7 +72,8 @@ export function useStressTest() {
     'main thread';
     if (stressLevelRef.current < 1) return;
     const level = stressLevelRef.current;
-    for (let i = 0; i < SHADOW_BIRD_COUNT; i++) {
+    const count = level >= 4 ? SHADOW_BIRD_COUNT : BASE_BIRD_COUNT;
+    for (let i = 0; i < count; i++) {
       const container = shadowRefs[i]?.current;
       const img = shadowImgRefs[i]?.current;
       if (container) {
@@ -100,8 +94,7 @@ export function useStressTest() {
     }
   }
 
-  // L2: HSL color cycling on pipe backgrounds
-  // 4 pipes × top/bot = 8 setStyleProperty(backgroundColor) per frame
+  // L2+: HSL color cycling on pipe backgrounds
   function applyPipeColorCycling(
     getPipeTopRef: (idx: number) => MainThread.Element | null,
     getPipeBotRef: (idx: number) => MainThread.Element | null,
@@ -120,7 +113,7 @@ export function useStressTest() {
     }
   }
 
-  // Reset pipe colors when exiting L2+ (restore CSS defaults)
+  // Reset pipe colors (restore CSS defaults)
   function resetPipeColors(
     getPipeTopRef: (idx: number) => MainThread.Element | null,
     getPipeBotRef: (idx: number) => MainThread.Element | null,
@@ -134,41 +127,30 @@ export function useStressTest() {
     }
   }
 
-  // Update button highlights to reflect current stress level
-  function updateStressBtnHighlight(): void {
-    'main thread';
-    const level = stressLevelRef.current;
-    for (let i = 0; i < 3; i++) {
-      const btn = stressBtnRefs[i]?.current;
-      if (btn) {
-        const isActive = level === i + 1;
-        btn.setStyleProperty('background-color', isActive ? 'rgba(0, 255, 136, 0.25)' : 'transparent');
-      }
-    }
-  }
-
-  // Set stress level directly; tapping the active level toggles back to L0
-  function setStressLevel(
-    target: number,
+  // Apply a new stress level — handles show/hide birds + reset pipes
+  function applyStressLevel(
+    newLevel: number,
     getPipeTopRef: (idx: number) => MainThread.Element | null,
     getPipeBotRef: (idx: number) => MainThread.Element | null,
   ): void {
     'main thread';
     const prev = stressLevelRef.current;
-    const next = prev === target ? 0 : target;
-    stressLevelRef.current = next;
+    stressLevelRef.current = newLevel;
 
-    if (prev === 0 && next >= 1) showShadowBirds(true);
-    if (next === 0) {
-      showShadowBirds(false);
+    const newCount = newLevel >= 4 ? SHADOW_BIRD_COUNT : BASE_BIRD_COUNT;
+
+    if (prev === 0 && newLevel >= 1) {
+      showShadowBirds(true, newCount);
+    } else if (newLevel === 0) {
+      showShadowBirds(false, 0);
       resetPipeColors(getPipeTopRef, getPipeBotRef);
+    } else if (newLevel >= 1) {
+      // Level changed between L1-L4: adjust visible bird count
+      showShadowBirds(true, newCount);
     }
-
-    updateStressBtnHighlight();
   }
 
-  // L3: Cross-thread flood — multiple runOnBackground calls per frame
-  // Costs: JSON.stringify on MTS + N × (postMessage serialization + BTS setState)
+  // L3+: Cross-thread flood — multiple runOnBackground calls per frame
   function sendStressSnapshot(snapshot: Record<string, unknown>): void {
     'main thread';
     if (stressLevelRef.current < 3) return;
@@ -184,14 +166,11 @@ export function useStressTest() {
     stressLevelRef,
     shadowRefs,
     shadowImgRefs,
-    stressGroupRef,
-    stressBtnRefs,
     showShadowBirds,
     updateShadowBirds,
     applyPipeColorCycling,
     resetPipeColors,
-    setStressLevel,
-    updateStressBtnHighlight,
+    applyStressLevel,
     sendStressSnapshot,
   };
 }
