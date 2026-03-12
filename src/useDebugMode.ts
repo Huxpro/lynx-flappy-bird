@@ -124,14 +124,14 @@ export function useDebugMode() {
       `fps ${fpsRef.current}  sc ${snap.score}`,
       `y ${snap.birdY.toFixed(1)}  v ${snap.velocity.toFixed(2)}`,
       `rot ${snap.rotation.toFixed(0)}  ${snap.birdVariant === 3 ? 'lynx' : ['yel', 'blu', 'red'][snap.birdVariant]}`,
-      `pipe ${pipeInfo}  count:${snap.pipeCount}`,
+      `pipe ${pipeInfo} n:${snap.pipeCount}`,
       `ptr ${snap.pointerMode}`,
     ];
     debugTextRef.current.setAttribute('text', lines.join('\n'));
     if (threadTextRef.current) {
       threadTextRef.current.setAttribute(
         'text',
-        `m>b ${mtsBtsCountRef.current}\nb>m ${btsMtsCountRef.current}`,
+        `mts→bts ${mtsBtsCountRef.current}\nbts→mts ${btsMtsCountRef.current}`,
       );
     }
   }

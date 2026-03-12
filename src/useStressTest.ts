@@ -39,8 +39,12 @@ const BENCH_FLOOR = 15;         // fps — stop benchmark below this
 const BENCH_THRESHOLDS = [55, 30] as const;
 
 function formatBenchResult(at55: number, at30: number, peakBirds: number, peakFps: number): string {
-  const fmt = (value: number) => (value >= 0 ? String(value) : '--');
-  return `55<${fmt(at55)}  30<${fmt(at30)}  pk ${peakBirds}@${peakFps}`;
+  'main thread';
+  const parts: string[] = [];
+  if (at55 >= 0) parts.push(`${at55}@55`);
+  if (at30 >= 0) parts.push(`${at30}@30`);
+  parts.push(`peak:${peakBirds}@${peakFps}`);
+  return parts.join(' ');
 }
 
 export function useStressTest(setStressBirdsBTS: (n: number) => void) {
@@ -180,13 +184,14 @@ export function useStressTest(setStressBirdsBTS: (n: number) => void) {
   }
 
   // Cancel a running benchmark (for game-over or leaving debug mode)
-  function cancelBenchmark(_reason: string): void {
+  function cancelBenchmark(reason: string): void {
     'main thread';
     if (!benchActiveRef.current) return;
     benchActiveRef.current = false;
     applyStressConfig(0, heavyRef.current, floodRef.current);
     runOnBackground(setStressBirdsBTS)(0);
     runOnBackground(setBenchActive)(false);
+    runOnBackground(setBenchResult)(reason);
   }
 
   // Advance to next step — apply new bird count and enter warmup
@@ -251,6 +256,7 @@ export function useStressTest(setStressBirdsBTS: (n: number) => void) {
     applyStressConfig(0, heavyRef.current, floodRef.current);
     runOnBackground(setStressBirdsBTS)(0);
     runOnBackground(setBenchActive)(true);
+    runOnBackground(setBenchResult)('');
   }
 
   // Cross-thread flood — calls driven by floodRef
