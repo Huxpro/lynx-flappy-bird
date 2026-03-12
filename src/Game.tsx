@@ -106,7 +106,7 @@ export function Game() {
   // Debug mode
   const {
     debugMode, setDebugMode, debugModeRef,
-    debugTextRef, mtsBtsLedRef, btsMtsLedRef, mtsBtsCountRef,
+    debugTextRef, threadTextRef, mtsBtsLedRef, btsMtsLedRef, mtsBtsCountRef,
     gap0Ref, gap1Ref, gap2Ref, gap3Ref,
     boundaryTopRef, boundaryBottomRef,
     applyDebugOverlay, updateBoundaryLines, flashMtsToBts, flashBtsToMts,
@@ -128,7 +128,7 @@ export function Game() {
     updateShadowBirds,
     applyStressConfig,
     sendStressSnapshot,
-    benchActive, benchActiveRef, benchResultLineRef,
+    benchActive, benchActiveRef, benchResult,
     tickBenchmark, startBenchmark, cancelBenchmark,
   } = useStressTest(setStressBirds);
 
@@ -309,10 +309,6 @@ export function Game() {
       pipesGapY: pipesGapYRef.current,
       score: scoreRef.current,
       pointerMode: lastPointerRef.current,
-      stressBirds: birdCountRef.current,
-      stressHeavy: heavyRef.current,
-      stressFlood: floodRef.current,
-      benchLine: benchResultLineRef.current,
     };
   }
 
@@ -816,13 +812,14 @@ export function Game() {
   }, [stressBirds, stressHeavy, syncStressConfig]);
 
   const handleAutopilotToggle = useCallback(() => {
+    if (benchActive) return;
     const next = !autopilot;
     setAutopilot(next);
     void runOnMainThread((v: number) => {
       'main thread';
       autopilotRef.current = !!v;
     })(next ? 1 : 0);
-  }, [autopilot]);
+  }, [autopilot, benchActive]);
 
   const handleAutoRamp = useCallback(() => {
     void runOnMainThread(() => {
@@ -978,6 +975,7 @@ export function Game() {
         <DevPanel
           visible={debugMode}
           debugTextRef={debugTextRef}
+          threadTextRef={threadTextRef}
           mtsBtsLedRef={mtsBtsLedRef}
           btsMtsLedRef={btsMtsLedRef}
           boundaryTopRef={boundaryTopRef}
@@ -987,6 +985,7 @@ export function Game() {
           flood={stressFlood}
           autopilot={autopilot}
           benchActive={benchActive}
+          benchResult={benchResult}
           onBirdsChange={handleBirdsChange}
           onHeavyToggle={handleHeavyToggle}
           onFloodChange={handleFloodChange}

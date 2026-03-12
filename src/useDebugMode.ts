@@ -12,10 +12,6 @@ export interface DebugSnapshot {
   pipesGapY: number[];
   score: number;
   pointerMode: string;
-  stressBirds: number;
-  stressHeavy: number;
-  stressFlood: number;
-  benchLine: string;
 }
 
 export function useDebugMode() {
@@ -26,6 +22,7 @@ export function useDebugMode() {
   const longPressTimerRef = useMainThreadRef(0);
   const longPressFiredRef = useMainThreadRef(false);
   const debugTextRef = useMainThreadRef<MainThread.Element>(null);
+  const threadTextRef = useMainThreadRef<MainThread.Element>(null);
   const mtsBtsLedRef = useMainThreadRef<MainThread.Element>(null);
   const btsMtsLedRef = useMainThreadRef<MainThread.Element>(null);
   const mtsBtsCountRef = useMainThreadRef(0);
@@ -127,15 +124,16 @@ export function useDebugMode() {
       `fps ${fpsRef.current}  sc ${snap.score}`,
       `y ${snap.birdY.toFixed(1)}  v ${snap.velocity.toFixed(2)}`,
       `rot ${snap.rotation.toFixed(0)}  ${snap.birdVariant === 3 ? 'lynx' : ['yel', 'blu', 'red'][snap.birdVariant]}`,
-      `pipe ${pipeInfo}  n ${snap.pipeCount}`,
-      `stress ${snap.stressBirds > 0 || snap.stressFlood > 0 ? [snap.stressBirds > 0 ? `${snap.stressBirds}` : '', snap.stressHeavy ? 'mut' : '', snap.stressFlood > 0 ? `${snap.stressFlood}x` : ''].filter(Boolean).join('+') : 'off'}`,
-      `m>b ${mtsBtsCountRef.current}${snap.stressFlood > 0 ? ` (${snap.stressFlood}/f)` : ''}  b>m ${btsMtsCountRef.current}`,
+      `pipe ${pipeInfo}  count:${snap.pipeCount}`,
       `ptr ${snap.pointerMode}`,
     ];
-    if (snap.benchLine) {
-      lines.push(snap.benchLine);
-    }
     debugTextRef.current.setAttribute('text', lines.join('\n'));
+    if (threadTextRef.current) {
+      threadTextRef.current.setAttribute(
+        'text',
+        `m>b ${mtsBtsCountRef.current}\nb>m ${btsMtsCountRef.current}`,
+      );
+    }
   }
 
   function updateGapZone(
@@ -201,6 +199,7 @@ export function useDebugMode() {
     debugModeRef,
     // Element refs (for JSX)
     debugTextRef,
+    threadTextRef,
     mtsBtsLedRef,
     btsMtsLedRef,
     gap0Ref,

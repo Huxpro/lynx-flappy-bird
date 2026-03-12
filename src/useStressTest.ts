@@ -38,6 +38,11 @@ const BENCH_MEASURE = 1500;     // ms — sample window for FPS
 const BENCH_FLOOR = 15;         // fps — stop benchmark below this
 const BENCH_THRESHOLDS = [55, 30] as const;
 
+function formatBenchResult(at55: number, at30: number, peakBirds: number, peakFps: number): string {
+  const fmt = (value: number) => (value >= 0 ? String(value) : '--');
+  return `55<${fmt(at55)}  30<${fmt(at30)}  pk ${peakBirds}@${peakFps}`;
+}
+
 export function useStressTest(setStressBirdsBTS: (n: number) => void) {
   // MTS config refs — set from BTS via runOnMainThread
   const birdCountRef = useMainThreadRef(0);
@@ -51,6 +56,7 @@ export function useStressTest(setStressBirdsBTS: (n: number) => void) {
   // ===== Auto-Ramp Benchmark State =====
   // BTS: UI state (button highlight, disable bird buttons)
   const [benchActive, setBenchActive] = useState(false);
+  const [benchResult, setBenchResult] = useState('');
 
   // MTS: per-frame state machine
   const benchActiveRef = useMainThreadRef(false);
@@ -58,15 +64,10 @@ export function useStressTest(setStressBirdsBTS: (n: number) => void) {
   const benchStepRef = useMainThreadRef(0);       // current step index (0-16)
   const benchPhaseStartRef = useMainThreadRef(0); // timestamp when current phase started
   const benchFrameCountRef = useMainThreadRef(0); // frames counted during measure phase
-
-  // MTS: threshold tracking (written per-step, read once at finish)
-  const benchAt55Ref = useMainThreadRef(-1);      // bird count when FPS first < 55
-  const benchAt30Ref = useMainThreadRef(-1);      // bird count when FPS first < 30
-  const benchPeakBirdsRef = useMainThreadRef(0);  // last completed step's bird count
-  const benchPeakFpsRef = useMainThreadRef(0);    // last completed step's FPS
-
-  // MTS: result line (formatted once at finish, read per-frame by debug text builder)
-  const benchResultLineRef = useMainThreadRef('');
+  const benchAt55Ref = useMainThreadRef(-1);
+  const benchAt30Ref = useMainThreadRef(-1);
+  const benchPeakBirdsRef = useMainThreadRef(0);
+  const benchPeakFpsRef = useMainThreadRef(0);
 
   // Shadow bird refs — constant loop count ensures deterministic hook ordering
   const shadowRefs: { current: MainThread.Element | null }[] = [];
@@ -150,7 +151,6 @@ export function useStressTest(setStressBirdsBTS: (n: number) => void) {
 
   // ===== Auto-Ramp Benchmark MTS Functions (TDZ-safe order) =====
 
-  // Record a completed step — update thresholds and peak
   function benchRecordStep(birds: number, fps: number): void {
     'main thread';
     benchPeakBirdsRef.current = birds;
@@ -163,30 +163,27 @@ export function useStressTest(setStressBirdsBTS: (n: number) => void) {
     }
   }
 
-  // Finish benchmark — format result line and reset bird count
+  // Finish benchmark — reset bird count and exit bench mode
   function benchFinish(): void {
     'main thread';
     benchActiveRef.current = false;
-    const parts: string[] = ['Auto:'];
-    if (benchAt55Ref.current >= 0) {
-      parts.push(`${benchAt55Ref.current}@55`);
-    }
-    if (benchAt30Ref.current >= 0) {
-      parts.push(`${benchAt30Ref.current}@30`);
-    }
-    parts.push(`peak:${benchPeakBirdsRef.current}@${benchPeakFpsRef.current}`);
-    benchResultLineRef.current = parts.join(' ');
+    const result = formatBenchResult(
+      benchAt55Ref.current,
+      benchAt30Ref.current,
+      benchPeakBirdsRef.current,
+      benchPeakFpsRef.current,
+    );
     applyStressConfig(0, heavyRef.current, floodRef.current);
     runOnBackground(setStressBirdsBTS)(0);
     runOnBackground(setBenchActive)(false);
+    runOnBackground(setBenchResult)(result);
   }
 
   // Cancel a running benchmark (for game-over or leaving debug mode)
-  function cancelBenchmark(reason: string): void {
+  function cancelBenchmark(_reason: string): void {
     'main thread';
     if (!benchActiveRef.current) return;
     benchActiveRef.current = false;
-    benchResultLineRef.current = reason;
     applyStressConfig(0, heavyRef.current, floodRef.current);
     runOnBackground(setStressBirdsBTS)(0);
     runOnBackground(setBenchActive)(false);
@@ -250,7 +247,6 @@ export function useStressTest(setStressBirdsBTS: (n: number) => void) {
     benchAt30Ref.current = -1;
     benchPeakBirdsRef.current = 0;
     benchPeakFpsRef.current = 0;
-    benchResultLineRef.current = 'running...';
     // Step 0: 0 birds (baseline)
     applyStressConfig(0, heavyRef.current, floodRef.current);
     runOnBackground(setStressBirdsBTS)(0);
@@ -281,7 +277,7 @@ export function useStressTest(setStressBirdsBTS: (n: number) => void) {
     // Auto-ramp benchmark
     benchActive,
     benchActiveRef,
-    benchResultLineRef,
+    benchResult,
     tickBenchmark,
     startBenchmark,
     cancelBenchmark,
