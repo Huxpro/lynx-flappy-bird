@@ -15,6 +15,7 @@ export interface DebugSnapshot {
   stressBirds: number;
   stressHeavy: number;
   stressFlood: number;
+  benchLine: string;
 }
 
 export function useDebugMode() {
@@ -141,6 +142,9 @@ export function useDebugMode() {
       `mts→bts: ${mtsBtsCountRef.current}${snap.stressFlood > 0 ? ` (${snap.stressFlood}/f)` : ''}  bts→mts: ${btsMtsCountRef.current}`,
       `ptr: ${snap.pointerMode}`,
     ];
+    if (snap.benchLine) {
+      lines.push(snap.benchLine);
+    }
     debugTextRef.current.setAttribute('text', lines.join('\n'));
   }
 
@@ -215,8 +219,9 @@ export function useDebugMode() {
     gap3Ref,
     boundaryTopRef,
     boundaryBottomRef,
-    // MTS counter ref (for external flood counting)
+    // MTS counter/value refs
     mtsBtsCountRef,
+    fpsRef,
     // MTS functions
     applyDebugOverlay,
     updateBoundaryLines,

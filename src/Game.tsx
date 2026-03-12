@@ -51,7 +51,8 @@ import { GameOverScreen } from './GameOverScreen.js';
 import { PipePair } from './PipePair.js';
 import { useDebugMode } from './useDebugMode.js';
 import type { DebugSnapshot } from './useDebugMode.js';
-import { useStressTest, SHADOW_X, SHADOW_BIRD_COUNT, BIRD_COUNT_OPTIONS, FLOOD_OPTIONS } from './useStressTest.js';
+import { useStressTest, SHADOW_X, SHADOW_BIRD_COUNT } from './useStressTest.js';
+import { DevPanel } from './DevPanel.js';
 
 const allBirdFrames = [
   [yellowBirdMid, yellowBirdDown, yellowBirdMid, yellowBirdUp],
@@ -113,6 +114,10 @@ export function Game() {
     startLongPress, endLongPress,
   } = useDebugMode();
 
+  // Autopilot (independent of benchmark)
+  const [autopilot, setAutopilot] = useState(false);
+  const autopilotRef = useMainThreadRef(false);
+
   // Stress test — orthogonal config
   const [stressBirds, setStressBirds] = useState(0);
   const [stressHeavy, setStressHeavy] = useState(0);
@@ -123,7 +128,9 @@ export function Game() {
     updateShadowBirds,
     applyStressConfig,
     sendStressSnapshot,
-  } = useStressTest();
+    benchActive, benchActiveRef, benchResultLineRef,
+    tickBenchmark, startBenchmark, cancelBenchmark,
+  } = useStressTest(setStressBirds);
 
   // Once a real touch event is observed, ignore all mouse events (synthesized).
   // This self-adapts: mobile sets it on first tap, desktop never sets it.
@@ -259,15 +266,15 @@ export function Game() {
     // Sync ground height to BTS for conditional UI positioning
     runOnBackground(setGroundHeight)(gH);
 
-    // Align debug overlays to dynamic ground height
+    // Align debug overlays at bottom of viewport (overlapping ground)
     if (debugTextRef.current) {
-      debugTextRef.current.setStyleProperty('bottom', `${gH + 4}px`);
+      debugTextRef.current.setStyleProperty('bottom', '2px');
     }
     if (mtsBtsLedRef.current) {
-      mtsBtsLedRef.current.setStyleProperty('bottom', `${gH + 6}px`);
+      mtsBtsLedRef.current.setStyleProperty('bottom', '4px');
     }
     if (btsMtsLedRef.current) {
-      btsMtsLedRef.current.setStyleProperty('bottom', `${gH + 6}px`);
+      btsMtsLedRef.current.setStyleProperty('bottom', '4px');
     }
     // Update debug boundary lines
     updateBoundaryLines(layout.playHeight, PIPE_GAP);
@@ -315,6 +322,7 @@ export function Game() {
       stressBirds: birdCountRef.current,
       stressHeavy: heavyRef.current,
       stressFlood: floodRef.current,
+      benchLine: benchResultLineRef.current,
     };
   }
 
@@ -354,7 +362,10 @@ export function Game() {
       applyBirdScale();
       updateBirdSprite();
     } else {
-      // Reset stress test when leaving debug mode
+      // Cancel benchmark, reset autopilot, and reset stress test when leaving debug mode
+      cancelBenchmark('cancelled');
+      autopilotRef.current = false;
+      runOnBackground(setAutopilot)(false);
       applyStressConfig(0, 0, 0);
       runOnBackground(setStressBirds)(0);
       runOnBackground(setStressHeavy)(0);
@@ -509,6 +520,27 @@ export function Game() {
     requestAnimationFrame(fallTick);
   }
 
+  // Autopilot: keep the bird alive by targeting pipe gaps (independent toggle OR benchmark)
+  function autoPilot(): void {
+    'main thread';
+    if (!(autopilotRef.current || benchActiveRef.current)) return;
+    if (gameStateRef.current !== 'playing') return;
+
+    // Target: center of next pipe gap ahead, or 40% of play height if no pipes
+    let targetY = dynamicPlayHeightRef.current * 0.4;
+    for (let i = 0; i < pipeCountRef.current; i++) {
+      if (pipesXRef.current[i]! + PIPE_WIDTH > BIRD_START_X - 10) {
+        targetY = pipesGapYRef.current[i]!;
+        break;
+      }
+    }
+
+    // Flap when below target and not already rising fast
+    if (birdYRef.current > targetY && velocityRef.current > -2) {
+      velocityRef.current = FLAP_IMPULSE;
+    }
+  }
+
   function gameTick(timestamp: number): void {
     'main thread';
     if (gameStateRef.current !== 'playing') return;
@@ -518,6 +550,9 @@ export function Game() {
       requestAnimationFrame(gameTick);
       return;
     }
+
+    // Autopilot: auto-flap to keep bird alive (independent toggle or benchmark)
+    autoPilot();
 
     const dt = Math.min(timestamp - lastTimeRef.current, 33.33);
     const dtScale = dt / 16.67;
@@ -601,8 +636,18 @@ export function Game() {
       }
     }
 
-    // Collision check
-    if (checkCollision(
+    // Collision check — skipped during autopilot or benchmark (bounds clamping)
+    if (autopilotRef.current || benchActiveRef.current) {
+      const playH = dynamicPlayHeightRef.current;
+      if (birdYRef.current + BIRD_HEIGHT >= playH) {
+        birdYRef.current = playH - BIRD_HEIGHT;
+        velocityRef.current = FLAP_IMPULSE;
+      }
+      if (birdYRef.current < 0) {
+        birdYRef.current = 0;
+        velocityRef.current = 1;
+      }
+    } else if (checkCollision(
       birdYRef.current,
       dynamicPlayHeightRef.current,
       pipeCountRef.current,
@@ -653,6 +698,7 @@ export function Game() {
       mtsBtsCountRef.current += floodRef.current;
     }
 
+    tickBenchmark(timestamp);
     requestAnimationFrame(gameTick);
   }
 
@@ -685,6 +731,7 @@ export function Game() {
     }
 
     updateDebugText(timestamp, getDebugSnapshot());
+    tickBenchmark(timestamp);
     requestAnimationFrame(idleBob);
   }
 
@@ -750,6 +797,64 @@ export function Game() {
       resetGame();
       gameStateRef.current = 'idle';
       startIdleAnimation();
+    })();
+  }, []);
+
+  // ===== DevPanel Callbacks =====
+
+  const handleBirdsChange = useCallback((n: number) => {
+    setStressBirds(n);
+    void runOnMainThread((b: number, h: number, f: number) => {
+      'main thread';
+      applyStressConfig(b, h, f);
+    })(n, stressHeavy, stressFlood);
+  }, [stressHeavy, stressFlood]);
+
+  const handleHeavyToggle = useCallback(() => {
+    const next = stressHeavy ? 0 : 1;
+    setStressHeavy(next);
+    void runOnMainThread((b: number, h: number, f: number) => {
+      'main thread';
+      applyStressConfig(b, h, f);
+    })(stressBirds, next, stressFlood);
+  }, [stressBirds, stressHeavy, stressFlood]);
+
+  const handleFloodChange = useCallback((n: number) => {
+    setStressFlood(n);
+    void runOnMainThread((b: number, h: number, f: number) => {
+      'main thread';
+      applyStressConfig(b, h, f);
+    })(stressBirds, stressHeavy, n);
+  }, [stressBirds, stressHeavy]);
+
+  const handleAutopilotToggle = useCallback(() => {
+    const next = !autopilot;
+    setAutopilot(next);
+    void runOnMainThread((v: number) => {
+      'main thread';
+      autopilotRef.current = !!v;
+    })(next ? 1 : 0);
+  }, [autopilot]);
+
+  const handleAutoRamp = useCallback(() => {
+    void runOnMainThread(() => {
+      'main thread';
+      // Starting a new benchmark: ensure game is playing
+      if (!benchActiveRef.current && gameStateRef.current !== 'playing') {
+        if (gameStateRef.current === 'gameover') {
+          resetGame();
+        }
+        gameStateRef.current = 'playing';
+        velocityRef.current = FLAP_IMPULSE;
+        lastTimeRef.current = 0;
+        scoreRef.current = debugModeRef.current ? 10 : 0;
+        flashMtsToBts();
+        runOnBackground(setScore)(scoreRef.current);
+        flashMtsToBts();
+        runOnBackground(setGameState)('playing');
+        requestAnimationFrame(gameTick);
+      }
+      startBenchmark();
     })();
   }, []);
 
@@ -866,18 +971,7 @@ export function Game() {
           />
         )}
 
-        {/* Debug info overlay */}
-        <text className="debug-text" main-thread:ref={debugTextRef} style={{ display: 'none' }}>
-          {' '}
-        </text>
-        {/* MTS↔BTS communication LEDs */}
-        <view className="debug-led debug-led-mts" main-thread:ref={mtsBtsLedRef} style={{ display: 'none' }} />
-        <view className="debug-led debug-led-bts" main-thread:ref={btsMtsLedRef} style={{ display: 'none' }} />
-        {/* Pipe spawn boundary lines */}
-        <view className="debug-boundary" main-thread:ref={boundaryTopRef} style={{ display: 'none' }} />
-        <view className="debug-boundary" main-thread:ref={boundaryBottomRef} style={{ display: 'none' }} />
-
-        {/* Touch area — must be last to sit on top of overlays */}
+        {/* Touch area — sits on top of game overlays for tap/long-press */}
         {/* Bind both touch + mouse: touch for mobile, mouse for desktop.
             On mobile web, browser synthesizes mouse from touch causing double-fire;
             startLongPress has a re-entry guard to handle this. */}
@@ -892,69 +986,25 @@ export function Game() {
           />
         )}
 
-        {/* Stress test panel — BTS-rendered, visible in debug mode */}
-        {debugMode && (
-          <view className="stress-panel" style={{ bottom: `${groundHeight + 18}px` }}>
-            <view className="stress-row">
-              {BIRD_COUNT_OPTIONS.map(n => (
-                <view
-                  key={`b-${n}`}
-                  className="stress-btn"
-                  style={{ backgroundColor: stressBirds === n ? 'rgba(0, 255, 136, 0.25)' : 'transparent' }}
-                  bindtap={() => {
-                    const next = stressBirds === n ? 0 : n;
-                    setStressBirds(next);
-                    void runOnMainThread((b: number, h: number, f: number) => {
-                      'main thread';
-                      applyStressConfig(b, h, f);
-                    })(next, stressHeavy, stressFlood);
-                  }}
-                >
-                  <text className="stress-btn-text" style={{ color: stressBirds === n ? '#ffffff' : 'rgba(0, 255, 136, 0.6)' }}>
-                    {n}
-                  </text>
-                </view>
-              ))}
-            </view>
-            <view className="stress-row">
-              <view
-                className="stress-btn"
-                style={{ backgroundColor: stressHeavy ? 'rgba(0, 255, 136, 0.25)' : 'transparent' }}
-                bindtap={() => {
-                  const next = stressHeavy ? 0 : 1;
-                  setStressHeavy(next);
-                  void runOnMainThread((b: number, h: number, f: number) => {
-                    'main thread';
-                    applyStressConfig(b, h, f);
-                  })(stressBirds, next, stressFlood);
-                }}
-              >
-                <text className="stress-btn-text" style={{ color: stressHeavy ? '#ffffff' : 'rgba(0, 255, 136, 0.6)' }}>
-                  mut
-                </text>
-              </view>
-              {FLOOD_OPTIONS.map(n => (
-                <view
-                  key={`f-${n}`}
-                  className="stress-btn"
-                  style={{ backgroundColor: stressFlood === n ? 'rgba(0, 255, 136, 0.25)' : 'transparent' }}
-                  bindtap={() => {
-                    const next = stressFlood === n ? 0 : n;
-                    setStressFlood(next);
-                    void runOnMainThread((b: number, h: number, f: number) => {
-                      'main thread';
-                      applyStressConfig(b, h, f);
-                    })(stressBirds, stressHeavy, next);
-                  }}
-                >
-                  <text className="stress-btn-text" style={{ color: stressFlood === n ? '#ffffff' : 'rgba(0, 255, 136, 0.6)' }}>
-                    {n}x
-                  </text>
-                </view>
-              ))}
-            </view>
-          </view>
-        )}
+        {/* DevPanel: debug overlay + stress test controls — AFTER touch area so inputs receive focus */}
+        <DevPanel
+          visible={debugMode}
+          debugTextRef={debugTextRef}
+          mtsBtsLedRef={mtsBtsLedRef}
+          btsMtsLedRef={btsMtsLedRef}
+          boundaryTopRef={boundaryTopRef}
+          boundaryBottomRef={boundaryBottomRef}
+          birds={stressBirds}
+          heavy={!!stressHeavy}
+          flood={stressFlood}
+          autopilot={autopilot}
+          benchActive={benchActive}
+          onBirdsChange={handleBirdsChange}
+          onHeavyToggle={handleHeavyToggle}
+          onFloodChange={handleFloodChange}
+          onAutopilotToggle={handleAutopilotToggle}
+          onAutoRamp={handleAutoRamp}
+        />
       </view>
     </view>
   );
