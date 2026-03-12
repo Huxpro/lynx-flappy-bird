@@ -944,7 +944,7 @@ export function Game() {
 
         {/* Debug hint — shown in idle when debug mode is off */}
         {gameState === 'idle' && !debugMode && (
-          <text className="debug-hint" style={{ bottom: `${groundHeight + 4}px` }}>long press for debug mode</text>
+          <text className="debug-hint" style={{ bottom: `${groundHeight - 2}px` }}>long press for debug mode</text>
         )}
 
         {/* Game over screen */}

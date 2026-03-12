@@ -38,12 +38,13 @@ const BENCH_MEASURE = 1500;     // ms — sample window for FPS
 const BENCH_FLOOR = 15;         // fps — stop benchmark below this
 const BENCH_THRESHOLDS = [55, 30] as const;
 
-function formatBenchResult(at55: number, at30: number, peakBirds: number, peakFps: number): string {
+function formatBenchResult(at55: number, at30: number, peakBirds: number, peakFps: number, flood: number): string {
   'main thread';
   const parts: string[] = [];
   if (at55 >= 0) parts.push(`${at55}@55`);
   if (at30 >= 0) parts.push(`${at30}@30`);
   parts.push(`peak:${peakBirds}@${peakFps}`);
+  if (flood > 0) parts.push(`${flood}x f`);
   return parts.join(' ');
 }
 
@@ -176,6 +177,7 @@ export function useStressTest(setStressBirdsBTS: (n: number) => void) {
       benchAt30Ref.current,
       benchPeakBirdsRef.current,
       benchPeakFpsRef.current,
+      floodRef.current,
     );
     applyStressConfig(0, heavyRef.current, floodRef.current);
     runOnBackground(setStressBirdsBTS)(0);
@@ -200,6 +202,7 @@ export function useStressTest(setStressBirdsBTS: (n: number) => void) {
     benchStepRef.current++;
     const birds = benchStepRef.current * BENCH_STEP;
     applyStressConfig(birds, heavyRef.current, floodRef.current);
+    runOnBackground(setStressBirdsBTS)(birds);
     benchPhaseRef.current = 'warmup';
     benchPhaseStartRef.current = 0; // initialized on next tick
   }

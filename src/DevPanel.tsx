@@ -15,13 +15,7 @@ const neutralChipStyle = {
   borderColor: 'rgba(255, 255, 255, 0.12)',
 };
 
-const heavyTone: ChipTone = {
-  activeBg: 'rgba(115, 191, 46, 0.6)',
-  activeBorder: 'rgba(115, 191, 46, 0.4)',
-  inactiveText: 'rgba(245, 255, 248, 0.88)',
-};
-
-const pilotTone: ChipTone = {
+const greenTone: ChipTone = {
   activeBg: 'rgba(115, 191, 46, 0.6)',
   activeBorder: 'rgba(115, 191, 46, 0.4)',
   inactiveText: 'rgba(245, 255, 248, 0.88)',
@@ -107,7 +101,10 @@ export function DevPanel({
 }: DevPanelProps) {
   const pilotActive = autopilot || benchActive;
   const modeLabel = benchActive ? 'BENCH -> PILOT' : autopilot ? 'PILOT ON' : 'MANUAL';
-  const pilotToneStyle = benchActive ? benchTone : pilotTone;
+  const pilotTone = benchActive ? benchTone : greenTone;
+  const inputWrapStyle = benchActive
+    ? { opacity: '0.35' }
+    : { opacity: '1' };
 
   return (
     <>
@@ -147,10 +144,11 @@ export function DevPanel({
               </text>
               <view className="dev-field dev-field-thread">
                 <text className="dev-field-lbl">FLOOD</text>
-                <view className="dev-input-wrap dev-input-wrap-thread">
+                <view className="dev-input-wrap dev-input-wrap-thread" style={inputWrapStyle}>
                   <input
                     className="dev-input"
                     type="number"
+                    disabled={benchActive}
                     value={String(flood)}
                     bindinput={(e: any) => {
                       onFloodChange(clampInteger(readInputValue(e), MAX_STRESS_FLOOD));
@@ -175,10 +173,11 @@ export function DevPanel({
             <view className="dev-bottom-row">
               <view className="dev-field dev-field-birds">
                 <text className="dev-field-lbl">BIRDS</text>
-                <view className="dev-input-wrap dev-input-wrap-birds">
+                <view className="dev-input-wrap dev-input-wrap-birds" style={inputWrapStyle}>
                   <input
                     className="dev-input"
                     type="number"
+                    disabled={benchActive}
                     value={String(birds)}
                     bindinput={(e: any) => {
                       onBirdsChange(clampInteger(readInputValue(e), MAX_STRESS_BIRDS));
@@ -192,20 +191,20 @@ export function DevPanel({
                 <view className="dev-action-row">
                   <view
                     className="dev-chip dev-chip-wide"
-                    style={getChipStyle(heavy, heavyTone)}
+                    style={getChipStyle(heavy, greenTone)}
                     bindtap={onHeavyToggle}
                   >
-                    <text className="dev-chip-t" style={getChipTextStyle(heavy, heavyTone)}>
+                    <text className="dev-chip-t" style={getChipTextStyle(heavy, greenTone)}>
                       MUT
                     </text>
                   </view>
 
                   <view
                     className="dev-chip dev-chip-wide"
-                    style={getChipStyle(pilotActive, pilotToneStyle)}
+                    style={getChipStyle(pilotActive, pilotTone)}
                     bindtap={benchActive ? undefined : onAutopilotToggle}
                   >
-                    <text className="dev-chip-t" style={getChipTextStyle(pilotActive, pilotToneStyle)}>
+                    <text className="dev-chip-t" style={getChipTextStyle(pilotActive, pilotTone)}>
                       PILOT
                     </text>
                   </view>
