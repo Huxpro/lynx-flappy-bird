@@ -39,6 +39,15 @@
   top: 200px;
 }
 
+/* Shadow birds (stress test L1+) — same as .bird but translucent, no fixed left */
+.shadow-bird {
+  position: absolute;
+  width: 34px;
+  height: 24px;
+  top: 200px;
+  opacity: 0.5;
+}
+
 .bird-img {
   width: 34px;
   height: 24px;
@@ -197,34 +206,40 @@
   opacity: 0;
 }
 
-/* Debug overlay */
-.debug-text {
+/* ===== Debug HUD ===== */
+.debug-hint {
   position: absolute;
-  bottom: 116px;
-  left: 4px;
-  font-size: 8px;
-  line-height: 10px;
+  left: 0;
+  font-size: 9px;
+  line-height: 11px;
   font-family: monospace;
-  color: white;
+  color: rgba(245, 255, 248, 0.96);
   white-space: pre;
+  background-color: rgba(6, 12, 10, 0.32);
+  border: 1px solid rgba(212, 255, 218, 0.12);
+  padding: 4px 6px;
+}
+
+.dev-hud {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 252px;
+  display: flex;
 }
 
 .debug-led {
-  position: absolute;
   width: 6px;
   height: 6px;
-  border-radius: 3px;
-  bottom: 118px;
   opacity: 0.15;
+  border-radius: 3px;
 }
 
 .debug-led-mts {
-  right: 14px;
   background-color: #ff8800;
 }
 
 .debug-led-bts {
-  right: 4px;
   background-color: #0088ff;
 }
 
@@ -235,6 +250,221 @@
   height: 1px;
   background-color: hotpink;
   opacity: 0.6;
+}
+
+.dev-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  background-color: rgba(6, 12, 10, 0.32);
+  border-top: 1px solid rgba(212, 255, 218, 0.12);
+  border-right: 1px solid rgba(212, 255, 218, 0.12);
+  padding: 6px 8px 28px 7px;
+}
+
+.dev-section {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.dev-top-row {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  align-items: flex-start;
+}
+
+.dev-section-debug {
+  width: 158px;
+  margin-right: 8px;
+}
+
+.dev-section-thread {
+  width: 72px;
+}
+
+.dev-header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 3px;
+}
+
+.dev-header-split {
+  justify-content: space-between;
+}
+
+.dev-title {
+  font-size: 8px;
+  line-height: 10px;
+  font-family: monospace;
+  color: rgba(245, 255, 248, 0.96);
+}
+
+.dev-mode {
+  font-size: 7px;
+  line-height: 9px;
+  font-family: monospace;
+  color: rgba(245, 255, 248, 0.82);
+}
+
+.dev-result-text {
+  margin-bottom: 4px;
+  font-size: 7px;
+  line-height: 9px;
+  font-family: monospace;
+  color: rgba(255, 240, 199, 0.94);
+  white-space: pre;
+}
+
+.dev-led-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.dev-led-group {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-right: 8px;
+}
+
+.dev-led-label {
+  margin-right: 3px;
+  font-size: 7px;
+  line-height: 9px;
+  font-family: monospace;
+  color: rgba(245, 255, 248, 0.82);
+}
+
+.dev-debug-text {
+  width: 100%;
+  font-size: 7px;
+  line-height: 10px;
+  font-family: monospace;
+  color: rgba(245, 255, 248, 0.96);
+  white-space: pre;
+}
+
+.dev-thread-text {
+  width: 100%;
+  font-size: 7px;
+  line-height: 10px;
+  font-family: monospace;
+  color: rgba(245, 255, 248, 0.96);
+  white-space: pre;
+}
+
+.dev-divider {
+  height: 1px;
+  background-color: rgba(255, 255, 255, 0.06);
+  margin-top: 4px;
+  margin-bottom: 5px;
+}
+
+.dev-bottom-row {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  align-items: flex-start;
+}
+
+.dev-action-row {
+  display: flex;
+  flex-direction: row;
+  width: 153px;
+  height: 20px;
+  align-items: stretch;
+  justify-content: space-between;
+}
+
+.dev-field {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.dev-field-lbl {
+  font-size: 7px;
+  line-height: 9px;
+  font-family: monospace;
+  color: rgba(245, 255, 248, 0.74);
+  margin-bottom: 1px;
+}
+
+.dev-field-thread {
+  margin-top: 4px;
+  width: 72px;
+}
+
+.dev-field-birds {
+  width: 76px;
+  margin-right: 8px;
+}
+
+.dev-field-actions {
+  width: 153px;
+}
+
+.dev-input-wrap {
+  display: flex;
+  height: 20px;
+  align-items: center;
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(212, 255, 218, 0.14);
+}
+
+.dev-input-wrap-thread {
+  width: 72px;
+}
+
+.dev-input-wrap-birds {
+  width: 76px;
+}
+
+.dev-input {
+  width: 100%;
+  height: 18px;
+  font-size: 10px;
+  line-height: 18px;
+  font-family: monospace;
+  color: #FFFFFF;
+  background-color: transparent;
+  border-width: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.dev-chip {
+  display: flex;
+  width: 47px;
+  height: 20px;
+  padding-left: 0;
+  padding-right: 0;
+  justify-content: center;
+  align-items: center;
+  border-width: 1px;
+  border-style: solid;
+}
+
+.dev-chip-wide {
+  margin-right: 0;
+}
+
+.dev-chip-end {
+  margin-right: 0;
+}
+
+.dev-chip-t {
+  font-size: 8px;
+  line-height: 10px;
+  font-family: monospace;
+  text-align: center;
 }
 
 /* Touch area covers the full game */

@@ -51,6 +51,8 @@ import { GameOverScreen } from './GameOverScreen.js';
 import { PipePair } from './PipePair.js';
 import { useDebugMode } from './useDebugMode.js';
 import type { DebugSnapshot } from './useDebugMode.js';
+import { useStressTest, SHADOW_X, SHADOW_BIRD_COUNT } from './useStressTest.js';
+import { DevPanel } from './DevPanel.js';
 
 const allBirdFrames = [
   [yellowBirdMid, yellowBirdDown, yellowBirdMid, yellowBirdUp],
@@ -104,13 +106,31 @@ export function Game() {
   // Debug mode
   const {
     debugMode, setDebugMode, debugModeRef,
-    debugTextRef, mtsBtsLedRef, btsMtsLedRef,
+    debugTextRef, threadTextRef, mtsBtsLedRef, btsMtsLedRef, mtsBtsCountRef,
     gap0Ref, gap1Ref, gap2Ref, gap3Ref,
     boundaryTopRef, boundaryBottomRef,
     applyDebugOverlay, updateBoundaryLines, flashMtsToBts, flashBtsToMts,
     updateDebugText, updateGapZone,
     startLongPress, endLongPress,
   } = useDebugMode();
+
+  // Autopilot (independent of benchmark)
+  const [autopilot, setAutopilot] = useState(false);
+  const autopilotRef = useMainThreadRef(false);
+
+  // Stress test — orthogonal config
+  const [stressBirds, setStressBirds] = useState(0);
+  const [stressHeavy, setStressHeavy] = useState(0);
+  const [stressFlood, setStressFlood] = useState(0);
+  const {
+    birdCountRef, heavyRef, floodRef,
+    shadowRefs, shadowImgRefs,
+    updateShadowBirds,
+    applyStressConfig,
+    sendStressSnapshot,
+    benchActive, benchActiveRef, benchResult,
+    tickBenchmark, startBenchmark, cancelBenchmark,
+  } = useStressTest(setStressBirds);
 
   // Once a real touch event is observed, ignore all mouse events (synthesized).
   // This self-adapts: mobile sets it on first tap, desktop never sets it.
@@ -246,17 +266,6 @@ export function Game() {
     // Sync ground height to BTS for conditional UI positioning
     runOnBackground(setGroundHeight)(gH);
 
-    // Align debug overlays to dynamic ground height
-    if (debugTextRef.current) {
-      debugTextRef.current.setStyleProperty('bottom', `${gH + 4}px`);
-    }
-    if (mtsBtsLedRef.current) {
-      mtsBtsLedRef.current.setStyleProperty('bottom', `${gH + 6}px`);
-    }
-    if (btsMtsLedRef.current) {
-      btsMtsLedRef.current.setStyleProperty('bottom', `${gH + 6}px`);
-    }
-
     // Update debug boundary lines
     updateBoundaryLines(layout.playHeight, PIPE_GAP);
 
@@ -339,6 +348,14 @@ export function Game() {
       applyBirdScale();
       updateBirdSprite();
     } else {
+      // Cancel benchmark, reset autopilot, and reset stress test when leaving debug mode
+      cancelBenchmark('cancelled');
+      autopilotRef.current = false;
+      runOnBackground(setAutopilot)(false);
+      applyStressConfig(0, 0, 0);
+      runOnBackground(setStressBirds)(0);
+      runOnBackground(setStressHeavy)(0);
+      runOnBackground(setStressFlood)(0);
       // Re-randomize when leaving debug mode
       randomizeVariants();
     }
@@ -489,6 +506,27 @@ export function Game() {
     requestAnimationFrame(fallTick);
   }
 
+  // Autopilot: keep the bird alive by targeting pipe gaps (independent toggle OR benchmark)
+  function autoPilot(): void {
+    'main thread';
+    if (!(autopilotRef.current || benchActiveRef.current)) return;
+    if (gameStateRef.current !== 'playing') return;
+
+    // Target: center of next pipe gap ahead, or 40% of play height if no pipes
+    let targetY = dynamicPlayHeightRef.current * 0.4;
+    for (let i = 0; i < pipeCountRef.current; i++) {
+      if (pipesXRef.current[i]! + PIPE_WIDTH > BIRD_START_X - 10) {
+        targetY = pipesGapYRef.current[i]!;
+        break;
+      }
+    }
+
+    // Flap when below target and not already rising fast
+    if (birdYRef.current > targetY && velocityRef.current > -2) {
+      velocityRef.current = FLAP_IMPULSE;
+    }
+  }
+
   function gameTick(timestamp: number): void {
     'main thread';
     if (gameStateRef.current !== 'playing') return;
@@ -498,6 +536,9 @@ export function Game() {
       requestAnimationFrame(gameTick);
       return;
     }
+
+    // Autopilot: auto-flap to keep bird alive (independent toggle or benchmark)
+    autoPilot();
 
     const dt = Math.min(timestamp - lastTimeRef.current, 33.33);
     const dtScale = dt / 16.67;
@@ -581,8 +622,18 @@ export function Game() {
       }
     }
 
-    // Collision check
-    if (checkCollision(
+    // Collision check — skipped during autopilot or benchmark (bounds clamping)
+    if (autopilotRef.current || benchActiveRef.current) {
+      const playH = dynamicPlayHeightRef.current;
+      if (birdYRef.current + BIRD_HEIGHT >= playH) {
+        birdYRef.current = playH - BIRD_HEIGHT;
+        velocityRef.current = FLAP_IMPULSE;
+      }
+      if (birdYRef.current < 0) {
+        birdYRef.current = 0;
+        velocityRef.current = 1;
+      }
+    } else if (checkCollision(
       birdYRef.current,
       dynamicPlayHeightRef.current,
       pipeCountRef.current,
@@ -615,6 +666,25 @@ export function Game() {
     }
 
     updateDebugText(timestamp, getDebugSnapshot());
+
+    // Stress test
+    updateShadowBirds(birdYRef.current, birdRotationRef.current, wingFrameRef.current, allBirdFrames);
+    sendStressSnapshot({
+      birdY: birdYRef.current,
+      velocity: velocityRef.current,
+      rotation: birdRotationRef.current,
+      score: scoreRef.current,
+      pipeCount: pipeCountRef.current,
+      pipesX: pipesXRef.current.slice(),
+      pipesGapY: pipesGapYRef.current.slice(),
+      timestamp,
+    });
+    // Count flood messages in debug stats
+    if (floodRef.current > 0) {
+      mtsBtsCountRef.current += floodRef.current;
+    }
+
+    tickBenchmark(timestamp);
     requestAnimationFrame(gameTick);
   }
 
@@ -639,7 +709,15 @@ export function Game() {
       updateBirdSprite();
     }
 
+    // Shadow birds follow idle bob
+    updateShadowBirds(y, 0, wingFrameRef.current, allBirdFrames);
+    sendStressSnapshot({ birdY: y, velocity: 0, rotation: 0, score: 0, pipeCount: 0, pipesX: [], pipesGapY: [], timestamp });
+    if (floodRef.current > 0) {
+      mtsBtsCountRef.current += floodRef.current;
+    }
+
     updateDebugText(timestamp, getDebugSnapshot());
+    tickBenchmark(timestamp);
     requestAnimationFrame(idleBob);
   }
 
@@ -650,7 +728,7 @@ export function Game() {
     requestAnimationFrame(idleBob);
   }
 
-  // ===== Touch Handler (MTS) =====
+  // ===== Touch Handlers (MTS) =====
 
   function onTouchStart(_e: MainThread.TouchEvent): void {
     'main thread';
@@ -705,6 +783,63 @@ export function Game() {
       resetGame();
       gameStateRef.current = 'idle';
       startIdleAnimation();
+    })();
+  }, []);
+
+  // ===== DevPanel Callbacks =====
+
+  const syncStressConfig = useCallback((birds: number, heavy: number, flood: number) => {
+    void runOnMainThread((b: number, h: number, f: number) => {
+      'main thread';
+      applyStressConfig(b, h, f);
+    })(birds, heavy, flood);
+  }, []);
+
+  const handleBirdsChange = useCallback((n: number) => {
+    setStressBirds(n);
+    syncStressConfig(n, stressHeavy, stressFlood);
+  }, [stressHeavy, stressFlood, syncStressConfig]);
+
+  const handleHeavyToggle = useCallback(() => {
+    const next = stressHeavy ? 0 : 1;
+    setStressHeavy(next);
+    syncStressConfig(stressBirds, next, stressFlood);
+  }, [stressBirds, stressHeavy, stressFlood, syncStressConfig]);
+
+  const handleFloodChange = useCallback((n: number) => {
+    setStressFlood(n);
+    syncStressConfig(stressBirds, stressHeavy, n);
+  }, [stressBirds, stressHeavy, syncStressConfig]);
+
+  const handleAutopilotToggle = useCallback(() => {
+    if (benchActive) return;
+    const next = !autopilot;
+    setAutopilot(next);
+    void runOnMainThread((v: number) => {
+      'main thread';
+      autopilotRef.current = !!v;
+    })(next ? 1 : 0);
+  }, [autopilot, benchActive]);
+
+  const handleAutoRamp = useCallback(() => {
+    void runOnMainThread(() => {
+      'main thread';
+      // Starting a new benchmark: ensure game is playing
+      if (!benchActiveRef.current && gameStateRef.current !== 'playing') {
+        if (gameStateRef.current === 'gameover') {
+          resetGame();
+        }
+        gameStateRef.current = 'playing';
+        velocityRef.current = FLAP_IMPULSE;
+        lastTimeRef.current = 0;
+        scoreRef.current = debugModeRef.current ? 10 : 0;
+        flashMtsToBts();
+        runOnBackground(setScore)(scoreRef.current);
+        flashMtsToBts();
+        runOnBackground(setGameState)('playing');
+        requestAnimationFrame(gameTick);
+      }
+      startBenchmark();
     })();
   }, []);
 
@@ -766,6 +901,22 @@ export function Game() {
           <image src={base} className="ground-img" />
         </view>
 
+        {/* Shadow birds (stress test L1+) — count driven by SHADOW_BIRD_COUNT */}
+        {Array.from({ length: SHADOW_BIRD_COUNT }, (_, i) => (
+          <view
+            key={`sb-${i}`}
+            className="shadow-bird"
+            main-thread:ref={shadowRefs[i]}
+            style={{ display: 'none', left: `${SHADOW_X[i]}px` }}
+          >
+            <image
+              src={allBirdFrames[Math.floor(i / 2) % 3]![0]!}
+              className="bird-img"
+              main-thread:ref={shadowImgRefs[i]}
+            />
+          </view>
+        ))}
+
         {/* Bird */}
         <view className="bird" main-thread:ref={birdRef}>
           <image src={yellowBirdMid} className="bird-img" main-thread:ref={birdImgRef} />
@@ -793,7 +944,7 @@ export function Game() {
 
         {/* Debug hint — shown in idle when debug mode is off */}
         {gameState === 'idle' && !debugMode && (
-          <text className="debug-text" style={{ bottom: `${groundHeight + 4}px` }}>long press for debug mode</text>
+          <text className="debug-hint" style={{ bottom: `${groundHeight - 2}px` }}>long press for debug mode</text>
         )}
 
         {/* Game over screen */}
@@ -805,18 +956,7 @@ export function Game() {
           />
         )}
 
-        {/* Debug info overlay */}
-        <text className="debug-text" main-thread:ref={debugTextRef} style={{ display: 'none' }}>
-          {' '}
-        </text>
-        {/* MTS↔BTS communication LEDs */}
-        <view className="debug-led debug-led-mts" main-thread:ref={mtsBtsLedRef} style={{ display: 'none' }} />
-        <view className="debug-led debug-led-bts" main-thread:ref={btsMtsLedRef} style={{ display: 'none' }} />
-        {/* Pipe spawn boundary lines */}
-        <view className="debug-boundary" main-thread:ref={boundaryTopRef} style={{ display: 'none' }} />
-        <view className="debug-boundary" main-thread:ref={boundaryBottomRef} style={{ display: 'none' }} />
-
-        {/* Touch area — must be last to sit on top of overlays */}
+        {/* Touch area — sits on top of game overlays for tap/long-press */}
         {/* Bind both touch + mouse: touch for mobile, mouse for desktop.
             On mobile web, browser synthesizes mouse from touch causing double-fire;
             startLongPress has a re-entry guard to handle this. */}
@@ -830,6 +970,28 @@ export function Game() {
             main-thread:bindmouseup={onTouchEnd as any}
           />
         )}
+
+        {/* Unified Dev HUD — after touch area so inputs receive focus */}
+        <DevPanel
+          visible={debugMode}
+          debugTextRef={debugTextRef}
+          threadTextRef={threadTextRef}
+          mtsBtsLedRef={mtsBtsLedRef}
+          btsMtsLedRef={btsMtsLedRef}
+          boundaryTopRef={boundaryTopRef}
+          boundaryBottomRef={boundaryBottomRef}
+          birds={stressBirds}
+          heavy={!!stressHeavy}
+          flood={stressFlood}
+          autopilot={autopilot}
+          benchActive={benchActive}
+          benchResult={benchResult}
+          onBirdsChange={handleBirdsChange}
+          onHeavyToggle={handleHeavyToggle}
+          onFloodChange={handleFloodChange}
+          onAutopilotToggle={handleAutopilotToggle}
+          onAutoRamp={handleAutoRamp}
+        />
       </view>
     </view>
   );

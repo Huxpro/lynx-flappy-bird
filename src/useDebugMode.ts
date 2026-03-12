@@ -22,6 +22,7 @@ export function useDebugMode() {
   const longPressTimerRef = useMainThreadRef(0);
   const longPressFiredRef = useMainThreadRef(false);
   const debugTextRef = useMainThreadRef<MainThread.Element>(null);
+  const threadTextRef = useMainThreadRef<MainThread.Element>(null);
   const mtsBtsLedRef = useMainThreadRef<MainThread.Element>(null);
   const btsMtsLedRef = useMainThreadRef<MainThread.Element>(null);
   const mtsBtsCountRef = useMainThreadRef(0);
@@ -56,15 +57,6 @@ export function useDebugMode() {
     const on = debugModeRef.current;
     if (birdRef.current) {
       birdRef.current.setStyleProperty('border', on ? '1px solid red' : 'none');
-    }
-    if (debugTextRef.current) {
-      debugTextRef.current.setStyleProperty('display', on ? 'flex' : 'none');
-    }
-    if (mtsBtsLedRef.current) {
-      mtsBtsLedRef.current.setStyleProperty('display', on ? 'flex' : 'none');
-    }
-    if (btsMtsLedRef.current) {
-      btsMtsLedRef.current.setStyleProperty('display', on ? 'flex' : 'none');
     }
     if (boundaryTopRef.current) {
       boundaryTopRef.current.setStyleProperty('display', on ? 'flex' : 'none');
@@ -129,15 +121,19 @@ export function useDebugMode() {
     }
 
     const lines = [
-      `fps: ${fpsRef.current}`,
-      `y: ${snap.birdY.toFixed(1)}  vel: ${snap.velocity.toFixed(2)}`,
-      `rot: ${snap.rotation.toFixed(0)}°  bird: ${snap.birdVariant === 3 ? 'lynx' : ['yel', 'blu', 'red'][snap.birdVariant]}`,
-      `pipe: ${pipeInfo}  n:${snap.pipeCount}`,
-      `score: ${snap.score}`,
-      `mts→bts: ${mtsBtsCountRef.current}  bts→mts: ${btsMtsCountRef.current}`,
-      `ptr: ${snap.pointerMode}`,
+      `fps ${fpsRef.current}  sc ${snap.score}`,
+      `y ${snap.birdY.toFixed(1)}  v ${snap.velocity.toFixed(2)}`,
+      `rot ${snap.rotation.toFixed(0)}  ${snap.birdVariant === 3 ? 'lynx' : ['yel', 'blu', 'red'][snap.birdVariant]}`,
+      `pipe ${pipeInfo} n:${snap.pipeCount}`,
+      `ptr ${snap.pointerMode}`,
     ];
     debugTextRef.current.setAttribute('text', lines.join('\n'));
+    if (threadTextRef.current) {
+      threadTextRef.current.setAttribute(
+        'text',
+        `mts→bts ${mtsBtsCountRef.current}\nbts→mts ${btsMtsCountRef.current}`,
+      );
+    }
   }
 
   function updateGapZone(
@@ -203,6 +199,7 @@ export function useDebugMode() {
     debugModeRef,
     // Element refs (for JSX)
     debugTextRef,
+    threadTextRef,
     mtsBtsLedRef,
     btsMtsLedRef,
     gap0Ref,
@@ -211,6 +208,9 @@ export function useDebugMode() {
     gap3Ref,
     boundaryTopRef,
     boundaryBottomRef,
+    // MTS counter/value refs
+    mtsBtsCountRef,
+    fpsRef,
     // MTS functions
     applyDebugOverlay,
     updateBoundaryLines,
