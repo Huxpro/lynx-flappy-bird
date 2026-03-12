@@ -51,7 +51,6 @@ export function useStressTest(setStressBirdsBTS: (n: number) => void) {
   // ===== Auto-Ramp Benchmark State =====
   // BTS: UI state (button highlight, disable bird buttons)
   const [benchActive, setBenchActive] = useState(false);
-  const [benchResult, setBenchResult] = useState('');
 
   // MTS: per-frame state machine
   const benchActiveRef = useMainThreadRef(false);
@@ -180,7 +179,6 @@ export function useStressTest(setStressBirdsBTS: (n: number) => void) {
     applyStressConfig(0, heavyRef.current, floodRef.current);
     runOnBackground(setStressBirdsBTS)(0);
     runOnBackground(setBenchActive)(false);
-    runOnBackground(setBenchResult)(benchResultLineRef.current);
   }
 
   // Cancel a running benchmark (for game-over or leaving debug mode)
@@ -192,7 +190,6 @@ export function useStressTest(setStressBirdsBTS: (n: number) => void) {
     applyStressConfig(0, heavyRef.current, floodRef.current);
     runOnBackground(setStressBirdsBTS)(0);
     runOnBackground(setBenchActive)(false);
-    runOnBackground(setBenchResult)(reason);
   }
 
   // Advance to next step — apply new bird count and enter warmup
@@ -285,7 +282,6 @@ export function useStressTest(setStressBirdsBTS: (n: number) => void) {
     benchActive,
     benchActiveRef,
     benchResultLineRef,
-    benchResult,
     tickBenchmark,
     startBenchmark,
     cancelBenchmark,

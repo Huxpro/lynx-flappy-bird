@@ -61,15 +61,6 @@ export function useDebugMode() {
     if (birdRef.current) {
       birdRef.current.setStyleProperty('border', on ? '1px solid red' : 'none');
     }
-    if (debugTextRef.current) {
-      debugTextRef.current.setStyleProperty('display', on ? 'flex' : 'none');
-    }
-    if (mtsBtsLedRef.current) {
-      mtsBtsLedRef.current.setStyleProperty('display', on ? 'flex' : 'none');
-    }
-    if (btsMtsLedRef.current) {
-      btsMtsLedRef.current.setStyleProperty('display', on ? 'flex' : 'none');
-    }
     if (boundaryTopRef.current) {
       boundaryTopRef.current.setStyleProperty('display', on ? 'flex' : 'none');
     }
@@ -133,14 +124,13 @@ export function useDebugMode() {
     }
 
     const lines = [
-      `fps: ${fpsRef.current}`,
-      `y: ${snap.birdY.toFixed(1)}  vel: ${snap.velocity.toFixed(2)}`,
-      `rot: ${snap.rotation.toFixed(0)}°  bird: ${snap.birdVariant === 3 ? 'lynx' : ['yel', 'blu', 'red'][snap.birdVariant]}`,
-      `pipe: ${pipeInfo}  n:${snap.pipeCount}`,
-      `score: ${snap.score}`,
-      `stress: ${snap.stressBirds > 0 || snap.stressFlood > 0 ? [snap.stressBirds > 0 ? `${snap.stressBirds}` : '', snap.stressHeavy ? 'mut' : '', snap.stressFlood > 0 ? `${snap.stressFlood}x` : ''].filter(Boolean).join('+') : 'off'}`,
-      `mts→bts: ${mtsBtsCountRef.current}${snap.stressFlood > 0 ? ` (${snap.stressFlood}/f)` : ''}  bts→mts: ${btsMtsCountRef.current}`,
-      `ptr: ${snap.pointerMode}`,
+      `fps ${fpsRef.current}  sc ${snap.score}`,
+      `y ${snap.birdY.toFixed(1)}  v ${snap.velocity.toFixed(2)}`,
+      `rot ${snap.rotation.toFixed(0)}  ${snap.birdVariant === 3 ? 'lynx' : ['yel', 'blu', 'red'][snap.birdVariant]}`,
+      `pipe ${pipeInfo}  n ${snap.pipeCount}`,
+      `stress ${snap.stressBirds > 0 || snap.stressFlood > 0 ? [snap.stressBirds > 0 ? `${snap.stressBirds}` : '', snap.stressHeavy ? 'mut' : '', snap.stressFlood > 0 ? `${snap.stressFlood}x` : ''].filter(Boolean).join('+') : 'off'}`,
+      `m>b ${mtsBtsCountRef.current}${snap.stressFlood > 0 ? ` (${snap.stressFlood}/f)` : ''}  b>m ${btsMtsCountRef.current}`,
+      `ptr ${snap.pointerMode}`,
     ];
     if (snap.benchLine) {
       lines.push(snap.benchLine);

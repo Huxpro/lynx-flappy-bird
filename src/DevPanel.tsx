@@ -1,6 +1,63 @@
 import type { MainThread } from '@lynx-js/types';
 import type { MainThreadRef } from '@lynx-js/react';
 
+const MAX_STRESS_BIRDS = 400;
+const MAX_STRESS_FLOOD = 100;
+
+type ChipTone = {
+  activeBg: string;
+  activeBorder: string;
+  inactiveText: string;
+};
+
+const neutralChipStyle = {
+  backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  borderColor: 'rgba(255, 255, 255, 0.12)',
+};
+
+const heavyTone: ChipTone = {
+  activeBg: 'rgba(115, 191, 46, 0.6)',
+  activeBorder: 'rgba(115, 191, 46, 0.4)',
+  inactiveText: 'rgba(255, 255, 255, 0.4)',
+};
+
+const pilotTone: ChipTone = {
+  activeBg: 'rgba(115, 191, 46, 0.6)',
+  activeBorder: 'rgba(115, 191, 46, 0.4)',
+  inactiveText: 'rgba(255, 255, 255, 0.4)',
+};
+
+const benchTone: ChipTone = {
+  activeBg: 'rgba(232, 163, 58, 0.6)',
+  activeBorder: 'rgba(232, 163, 58, 0.4)',
+  inactiveText: 'rgba(232, 163, 58, 0.7)',
+};
+
+function getChipStyle(active: boolean, tone: ChipTone) {
+  return active
+    ? {
+        backgroundColor: tone.activeBg,
+        borderColor: tone.activeBorder,
+      }
+    : neutralChipStyle;
+}
+
+function getChipTextStyle(active: boolean, tone: ChipTone) {
+  return {
+    color: active ? '#FFFFFF' : tone.inactiveText,
+  };
+}
+
+function readInputValue(event: any): string {
+  return String(event?.detail?.value ?? event?.target?.value ?? '0');
+}
+
+function clampInteger(raw: string, max: number): number {
+  const parsed = Number.parseInt(raw, 10);
+  if (Number.isNaN(parsed)) return 0;
+  return Math.max(0, Math.min(max, parsed));
+}
+
 interface DevPanelProps {
   visible: boolean;
 
@@ -44,105 +101,108 @@ export function DevPanel({
   onAutopilotToggle,
   onAutoRamp,
 }: DevPanelProps) {
+  const modeLabel = benchActive ? 'BENCH LIVE' : autopilot ? 'PILOT READY' : 'MANUAL';
+
   return (
     <>
-      {/* Debug info overlay — MTS-controlled text */}
-      <text className="debug-text" main-thread:ref={debugTextRef} style={{ display: 'none' }}>
-        {' '}
-      </text>
-      {/* MTS↔BTS communication LEDs */}
-      <view className="debug-led debug-led-mts" main-thread:ref={mtsBtsLedRef} style={{ display: 'none' }} />
-      <view className="debug-led debug-led-bts" main-thread:ref={btsMtsLedRef} style={{ display: 'none' }} />
       {/* Pipe spawn boundary lines */}
       <view className="debug-boundary" main-thread:ref={boundaryTopRef} style={{ display: 'none' }} />
       <view className="debug-boundary" main-thread:ref={boundaryBottomRef} style={{ display: 'none' }} />
 
-      {/* Dev controls — compact HUD at bottom-right */}
-      {visible && (
+      {/* Unified dev HUD: debug info + thread status + stress controls */}
+      <view className="dev-hud" style={{ display: visible ? 'flex' : 'none' }}>
         <view className="dev-panel">
-          {/* Row 1: BIRDS input + MUT toggle + FLOOD input */}
-          <view className="dev-row">
-            <view className="dev-field">
-              <text className="dev-field-lbl">BIRDS</text>
-              <view className="dev-input-wrap">
-                <input
-                  className="dev-input"
-                  type="number"
-                  value={String(birds)}
-                  bindinput={(e: any) => {
-                    const v = Math.max(0, Math.min(400, parseInt(e.detail?.value ?? e.target?.value ?? '0', 10) || 0));
-                    onBirdsChange(v);
-                  }}
-                />
+          <view className="dev-section">
+            <view className="dev-header dev-header-split">
+              <text className="dev-title">DEBUG INFO</text>
+              <view className="dev-led-cluster">
+                <view className="dev-led-group">
+                  <text className="dev-led-label">M</text>
+                  <view className="debug-led debug-led-mts" main-thread:ref={mtsBtsLedRef} />
+                </view>
+                <view className="dev-led-group">
+                  <text className="dev-led-label">B</text>
+                  <view className="debug-led debug-led-bts" main-thread:ref={btsMtsLedRef} />
+                </view>
               </view>
             </view>
-            <view
-              className="dev-chip"
-              style={{
-                backgroundColor: heavy ? 'rgba(115, 191, 46, 0.6)' : 'rgba(255, 255, 255, 0.08)',
-                borderColor: heavy ? 'rgba(115, 191, 46, 0.4)' : 'rgba(255, 255, 255, 0.12)',
-              }}
-              bindtap={onHeavyToggle}
-            >
-              <text
-                className="dev-chip-t"
-                style={{ color: heavy ? '#FFFFFF' : 'rgba(255, 255, 255, 0.4)' }}
-              >
-                MUT
-              </text>
-            </view>
-            <view className="dev-field">
-              <text className="dev-field-lbl">FLOOD</text>
-              <view className="dev-input-wrap">
-                <input
-                  className="dev-input"
-                  type="number"
-                  value={String(flood)}
-                  bindinput={(e: any) => {
-                    const v = Math.max(0, Math.min(100, parseInt(e.detail?.value ?? e.target?.value ?? '0', 10) || 0));
-                    onFloodChange(v);
-                  }}
-                />
-              </view>
-            </view>
+            <text className="dev-debug-text" main-thread:ref={debugTextRef}>
+              {' '}
+            </text>
           </view>
 
-          {/* Row 2: PILOT toggle + BENCH action */}
-          <view className="dev-row">
-            <view
-              className="dev-chip"
-              style={{
-                backgroundColor: autopilot ? 'rgba(115, 191, 46, 0.6)' : 'rgba(255, 255, 255, 0.08)',
-                borderColor: autopilot ? 'rgba(115, 191, 46, 0.4)' : 'rgba(255, 255, 255, 0.12)',
-              }}
-              bindtap={onAutopilotToggle}
-            >
-              <text
-                className="dev-chip-t"
-                style={{ color: autopilot ? '#FFFFFF' : 'rgba(255, 255, 255, 0.4)' }}
-              >
-                PILOT
-              </text>
+          <view className="dev-divider" />
+
+          <view className="dev-section">
+            <view className="dev-header dev-header-split">
+              <text className="dev-title">STRESS LAB</text>
+              <text className="dev-mode">{modeLabel}</text>
             </view>
-            <view className="dev-spacer" />
-            <view
-              className="dev-chip"
-              style={{
-                backgroundColor: benchActive ? 'rgba(232, 163, 58, 0.6)' : 'rgba(255, 255, 255, 0.08)',
-                borderColor: benchActive ? 'rgba(232, 163, 58, 0.4)' : 'rgba(255, 255, 255, 0.12)',
-              }}
-              bindtap={onAutoRamp}
-            >
-              <text
-                className="dev-chip-t"
-                style={{ color: benchActive ? '#FFFFFF' : 'rgba(232, 163, 58, 0.7)' }}
+
+            <view className="dev-row">
+              <view className="dev-field dev-field-wide">
+                <text className="dev-field-lbl">BIRDS</text>
+                <view className="dev-input-wrap">
+                  <input
+                    className="dev-input"
+                    type="number"
+                    value={String(birds)}
+                    bindinput={(e: any) => {
+                      onBirdsChange(clampInteger(readInputValue(e), MAX_STRESS_BIRDS));
+                    }}
+                  />
+                </view>
+              </view>
+
+              <view className="dev-field dev-field-wide dev-field-end">
+                <text className="dev-field-lbl">FLOOD</text>
+                <view className="dev-input-wrap">
+                  <input
+                    className="dev-input"
+                    type="number"
+                    value={String(flood)}
+                    bindinput={(e: any) => {
+                      onFloodChange(clampInteger(readInputValue(e), MAX_STRESS_FLOOD));
+                    }}
+                  />
+                </view>
+              </view>
+            </view>
+
+            <view className="dev-row dev-row-actions">
+              <view
+                className="dev-chip dev-chip-wide"
+                style={getChipStyle(heavy, heavyTone)}
+                bindtap={onHeavyToggle}
               >
-                {benchActive ? 'STOP' : 'BENCH'}
-              </text>
+                <text className="dev-chip-t" style={getChipTextStyle(heavy, heavyTone)}>
+                  MUT
+                </text>
+              </view>
+
+              <view
+                className="dev-chip dev-chip-wide"
+                style={getChipStyle(autopilot, pilotTone)}
+                bindtap={onAutopilotToggle}
+              >
+                <text className="dev-chip-t" style={getChipTextStyle(autopilot, pilotTone)}>
+                  PILOT
+                </text>
+              </view>
+
+              <view
+                className="dev-chip dev-chip-wide dev-chip-end"
+                style={getChipStyle(benchActive, benchTone)}
+                bindtap={onAutoRamp}
+              >
+                <text className="dev-chip-t" style={getChipTextStyle(benchActive, benchTone)}>
+                  {benchActive ? 'STOP' : 'BENCH'}
+                </text>
+              </view>
             </view>
           </view>
         </view>
-      )}
+      </view>
     </>
   );
 }

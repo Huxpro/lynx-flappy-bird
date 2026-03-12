@@ -266,16 +266,6 @@ export function Game() {
     // Sync ground height to BTS for conditional UI positioning
     runOnBackground(setGroundHeight)(gH);
 
-    // Align debug overlays at bottom of viewport (overlapping ground)
-    if (debugTextRef.current) {
-      debugTextRef.current.setStyleProperty('bottom', '2px');
-    }
-    if (mtsBtsLedRef.current) {
-      mtsBtsLedRef.current.setStyleProperty('bottom', '4px');
-    }
-    if (btsMtsLedRef.current) {
-      btsMtsLedRef.current.setStyleProperty('bottom', '4px');
-    }
     // Update debug boundary lines
     updateBoundaryLines(layout.playHeight, PIPE_GAP);
 
@@ -802,30 +792,28 @@ export function Game() {
 
   // ===== DevPanel Callbacks =====
 
-  const handleBirdsChange = useCallback((n: number) => {
-    setStressBirds(n);
+  const syncStressConfig = useCallback((birds: number, heavy: number, flood: number) => {
     void runOnMainThread((b: number, h: number, f: number) => {
       'main thread';
       applyStressConfig(b, h, f);
-    })(n, stressHeavy, stressFlood);
-  }, [stressHeavy, stressFlood]);
+    })(birds, heavy, flood);
+  }, []);
+
+  const handleBirdsChange = useCallback((n: number) => {
+    setStressBirds(n);
+    syncStressConfig(n, stressHeavy, stressFlood);
+  }, [stressHeavy, stressFlood, syncStressConfig]);
 
   const handleHeavyToggle = useCallback(() => {
     const next = stressHeavy ? 0 : 1;
     setStressHeavy(next);
-    void runOnMainThread((b: number, h: number, f: number) => {
-      'main thread';
-      applyStressConfig(b, h, f);
-    })(stressBirds, next, stressFlood);
-  }, [stressBirds, stressHeavy, stressFlood]);
+    syncStressConfig(stressBirds, next, stressFlood);
+  }, [stressBirds, stressHeavy, stressFlood, syncStressConfig]);
 
   const handleFloodChange = useCallback((n: number) => {
     setStressFlood(n);
-    void runOnMainThread((b: number, h: number, f: number) => {
-      'main thread';
-      applyStressConfig(b, h, f);
-    })(stressBirds, stressHeavy, n);
-  }, [stressBirds, stressHeavy]);
+    syncStressConfig(stressBirds, stressHeavy, n);
+  }, [stressBirds, stressHeavy, syncStressConfig]);
 
   const handleAutopilotToggle = useCallback(() => {
     const next = !autopilot;
@@ -959,7 +947,7 @@ export function Game() {
 
         {/* Debug hint — shown in idle when debug mode is off */}
         {gameState === 'idle' && !debugMode && (
-          <text className="debug-text" style={{ bottom: `${groundHeight + 4}px` }}>long press for debug mode</text>
+          <text className="debug-hint" style={{ bottom: `${groundHeight + 4}px` }}>long press for debug mode</text>
         )}
 
         {/* Game over screen */}
@@ -986,7 +974,7 @@ export function Game() {
           />
         )}
 
-        {/* DevPanel: debug overlay + stress test controls — AFTER touch area so inputs receive focus */}
+        {/* Unified Dev HUD — after touch area so inputs receive focus */}
         <DevPanel
           visible={debugMode}
           debugTextRef={debugTextRef}
