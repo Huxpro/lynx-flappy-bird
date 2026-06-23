@@ -2,6 +2,8 @@
 
 A cross-platform Flappy Bird vibe-coded with [Lynx](https://lynxjs.org/) and [Vue Lynx](https://vue.lynxjs.org) — play it in a web browser or render it natively on mobile, same codebase, same feel.
 
+**Play it live:** [Vue Lynx edition](https://huangxuan.me/lynx-flappy-bird/vue/) · [ReactLynx edition](https://huangxuan.me/lynx-flappy-bird/) — the two ports run side by side from the same GitHub Pages deploy.
+
 - 4 bird variants: **Lynx** (by Nanobanana), classic yellow, blue, and red — randomly picked each round along with day/night backgrounds
 - Debug mode (long-press): live FPS counter, hitboxes, pipe gap zones, and MTS/BTS message LED indicators
 

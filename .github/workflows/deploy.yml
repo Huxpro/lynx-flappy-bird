@@ -14,6 +14,13 @@ concurrency:
   group: pages
   cancel-in-progress: true
 
+env:
+  # Pre-port ReactLynx edition. It is rebuilt from this pinned commit and
+  # served at the site root so it coexists with the Vue Lynx edition, which
+  # is built from the current source and served under /vue/.
+  # (Commit "feat: stress test levels (L0-L3)", the last ReactLynx commit on main.)
+  REACTLYNX_REF: 1affd989f9bc757814dc7207c65f91097b0a4f33
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -22,22 +29,38 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history so the pinned ReactLynx commit can be checked out.
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      - run: npm install
+      # --- Vue Lynx edition (current source) → _site/vue ---
+      - name: Build Vue Lynx edition (served at /lynx-flappy-bird/vue/)
+        run: |
+          npm install
+          (cd website && npm install)
+          npm run build:website
+          mkdir -p _site
+          cp -r website/dist _site/vue
 
-      - run: cd website && npm install
-
-      - run: npm run build:website
+      # --- ReactLynx edition (pinned commit) → _site root ---
+      - name: Build ReactLynx edition (served at /lynx-flappy-bird/)
+        run: |
+          git worktree add ../reactlynx "$REACTLYNX_REF"
+          cd ../reactlynx
+          npm install
+          (cd website && npm install)
+          npm run build:website
+          cp -r website/dist/. "$GITHUB_WORKSPACE/_site/"
 
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: website/dist
+          path: _site
 
       - id: deployment
         uses: actions/deploy-pages@v4

@@ -18,7 +18,7 @@ export default defineConfig({
     }),
   ],
   output: {
-    assetPrefix: process.env.VERCEL ? '/' : 'https://huangxuan.me/lynx-flappy-bird/',
+    assetPrefix: process.env.VERCEL ? '/' : 'https://huangxuan.me/lynx-flappy-bird/vue/',
   },
   environments: {
     web: {},
