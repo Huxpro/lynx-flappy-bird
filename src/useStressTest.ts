@@ -1,6 +1,5 @@
-import { useMainThreadRef, useState } from '@lynx-js/react';
-import { runOnBackground } from '@lynx-js/react';
-import type { MainThread } from '@lynx-js/types';
+import { ref, runOnBackground, useMainThreadRef } from 'vue-lynx';
+import type { MTElement } from './types.js';
 
 // ===== Orthogonal Stress Dimensions =====
 // Freely composable for A/B performance analysis:
@@ -10,7 +9,7 @@ import type { MainThread } from '@lynx-js/types';
 export const BIRD_COUNT_OPTIONS = [100, 200, 400] as const;
 export const FLOOD_OPTIONS = [10, 50] as const;
 
-// Max bird count — determines ref allocation and JSX element count
+// Max bird count — determines ref allocation and element count
 export const SHADOW_BIRD_COUNT = Math.max(...BIRD_COUNT_OPTIONS);
 
 const PAYLOAD_PAD = 'x'.repeat(4096); // 4KB padding per flood call
@@ -56,12 +55,21 @@ export function useStressTest(setStressBirdsBTS: (n: number) => void) {
   const tickRef = useMainThreadRef(0);
 
   // BTS state for cross-thread flood target
-  const [, setStressPayload] = useState<unknown>(null);
+  const stressPayload = ref<unknown>(null);
+  function setStressPayload(v: unknown): void {
+    stressPayload.value = v;
+  }
 
   // ===== Auto-Ramp Benchmark State =====
   // BTS: UI state (button highlight, disable bird buttons)
-  const [benchActive, setBenchActive] = useState(false);
-  const [benchResult, setBenchResult] = useState('');
+  const benchActive = ref(false);
+  function setBenchActive(v: boolean): void {
+    benchActive.value = v;
+  }
+  const benchResult = ref('');
+  function setBenchResult(v: string): void {
+    benchResult.value = v;
+  }
 
   // MTS: per-frame state machine
   const benchActiveRef = useMainThreadRef(false);
@@ -74,14 +82,12 @@ export function useStressTest(setStressBirdsBTS: (n: number) => void) {
   const benchPeakBirdsRef = useMainThreadRef(0);
   const benchPeakFpsRef = useMainThreadRef(0);
 
-  // Shadow bird refs — constant loop count ensures deterministic hook ordering
-  const shadowRefs: { current: MainThread.Element | null }[] = [];
-  const shadowImgRefs: { current: MainThread.Element | null }[] = [];
+  // Shadow bird refs — constant loop count ensures deterministic allocation
+  const shadowRefs: { current: MTElement | null }[] = [];
+  const shadowImgRefs: { current: MTElement | null }[] = [];
   for (let i = 0; i < SHADOW_BIRD_COUNT; i++) {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    shadowRefs.push(useMainThreadRef<MainThread.Element>(null));
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    shadowImgRefs.push(useMainThreadRef<MainThread.Element>(null));
+    shadowRefs.push(useMainThreadRef<MTElement | null>(null));
+    shadowImgRefs.push(useMainThreadRef<MTElement | null>(null));
   }
 
   // ===== MTS helpers (callee-before-caller order) =====

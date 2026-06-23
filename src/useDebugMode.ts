@@ -1,5 +1,5 @@
-import { useMainThreadRef, useState } from '@lynx-js/react';
-import type { MainThread } from '@lynx-js/types';
+import { ref, useMainThreadRef } from 'vue-lynx';
+import type { MTElement, MTRef } from './types.js';
 import { BIRD_START_X, PIPE_WIDTH } from './mts/constants.js';
 
 export interface DebugSnapshot {
@@ -15,16 +15,20 @@ export interface DebugSnapshot {
 }
 
 export function useDebugMode() {
-  const [debugMode, setDebugMode] = useState(false);
+  // BTS reactive state
+  const debugMode = ref(false);
+  function setDebugMode(v: boolean): void {
+    debugMode.value = v;
+  }
 
   // Refs
   const debugModeRef = useMainThreadRef(false);
   const longPressTimerRef = useMainThreadRef(0);
   const longPressFiredRef = useMainThreadRef(false);
-  const debugTextRef = useMainThreadRef<MainThread.Element>(null);
-  const threadTextRef = useMainThreadRef<MainThread.Element>(null);
-  const mtsBtsLedRef = useMainThreadRef<MainThread.Element>(null);
-  const btsMtsLedRef = useMainThreadRef<MainThread.Element>(null);
+  const debugTextRef = useMainThreadRef<MTElement | null>(null);
+  const threadTextRef = useMainThreadRef<MTElement | null>(null);
+  const mtsBtsLedRef = useMainThreadRef<MTElement | null>(null);
+  const btsMtsLedRef = useMainThreadRef<MTElement | null>(null);
   const mtsBtsCountRef = useMainThreadRef(0);
   const btsMtsCountRef = useMainThreadRef(0);
   const fpsRef = useMainThreadRef(0);
@@ -32,14 +36,14 @@ export function useDebugMode() {
   const fpsLastTime = useMainThreadRef(0);
 
   // Gap zone refs
-  const gap0Ref = useMainThreadRef<MainThread.Element>(null);
-  const gap1Ref = useMainThreadRef<MainThread.Element>(null);
-  const gap2Ref = useMainThreadRef<MainThread.Element>(null);
-  const gap3Ref = useMainThreadRef<MainThread.Element>(null);
+  const gap0Ref = useMainThreadRef<MTElement | null>(null);
+  const gap1Ref = useMainThreadRef<MTElement | null>(null);
+  const gap2Ref = useMainThreadRef<MTElement | null>(null);
+  const gap3Ref = useMainThreadRef<MTElement | null>(null);
 
   // Pipe spawn boundary lines (upper/lower safe area limits)
-  const boundaryTopRef = useMainThreadRef<MainThread.Element>(null);
-  const boundaryBottomRef = useMainThreadRef<MainThread.Element>(null);
+  const boundaryTopRef = useMainThreadRef<MTElement | null>(null);
+  const boundaryBottomRef = useMainThreadRef<MTElement | null>(null);
 
   // ===== MTS functions (callee-before-caller order) =====
 
@@ -52,7 +56,7 @@ export function useDebugMode() {
     return null;
   }
 
-  function applyDebugOverlay(birdRef: { current: MainThread.Element | null }): void {
+  function applyDebugOverlay(birdRef: MTRef): void {
     'main thread';
     const on = debugModeRef.current;
     if (birdRef.current) {
@@ -66,7 +70,7 @@ export function useDebugMode() {
     }
   }
 
-  function flashLed(ref: { current: MainThread.Element | null }): void {
+  function flashLed(ref: MTRef): void {
     'main thread';
     if (ref.current) {
       ref.current.setStyleProperty('opacity', '1');
@@ -197,7 +201,7 @@ export function useDebugMode() {
     setDebugMode,
     // MTS ref (read by game logic)
     debugModeRef,
-    // Element refs (for JSX)
+    // Element refs (for templates)
     debugTextRef,
     threadTextRef,
     mtsBtsLedRef,

@@ -1,15 +1,15 @@
 {
   "compilerOptions": {
-    "jsx": "react-jsx",
-    "jsxImportSource": "@lynx-js/react",
-    "noEmit": true,
-    "allowJs": true,
-    "checkJs": true,
-    "isolatedDeclarations": false,
     "strict": true,
     "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+
     "esModuleInterop": true,
     "skipLibCheck": true
   },
-  "include": ["src", "lynx.config.js"]
+  "references": [
+    { "path": "./tsconfig.node.json" },
+    { "path": "./src" }
+  ],
+  "files": []
 }

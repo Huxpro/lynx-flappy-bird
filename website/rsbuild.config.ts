@@ -16,15 +16,15 @@ export default defineConfig({
     favicon: '../public/favicon.png',
     meta: {
       description:
-        'A cross-platform Flappy Bird vibe-coded with ReactLynx. Play in the browser or natively on mobile — same codebase, same feel.',
+        'A cross-platform Flappy Bird vibe-coded with Vue Lynx. Play in the browser or natively on mobile — same codebase, same feel.',
       'og:title': 'Lynx Flappy Bird',
       'og:description':
-        'A cross-platform Flappy Bird built with ReactLynx. Play it in a web browser or render it natively on mobile.',
+        'A cross-platform Flappy Bird built with Vue Lynx. Play it in a web browser or render it natively on mobile.',
       'og:type': 'website',
       'twitter:card': 'summary',
       'twitter:title': 'Lynx Flappy Bird',
       'twitter:description':
-        'Flappy Bird vibe-coded with ReactLynx — cross-platform, native-grade performance.',
+        'Flappy Bird vibe-coded with Vue Lynx — cross-platform, native-grade performance.',
     },
     tags: [
       { tag: 'link', attrs: { rel: 'manifest', href: 'manifest.json' } },
