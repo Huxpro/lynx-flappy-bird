@@ -94,8 +94,8 @@ export function App() {
             main thread
           </a>{' '}
           for zero-latency input;{' '}
-          <a href="https://lynxjs.org/react" target="_blank" rel="noreferrer">
-            ReactLynx
+          <a href="https://vue.lynxjs.org" target="_blank" rel="noreferrer">
+            Vue Lynx
           </a>{' '}
           manages the UI shell — score, menus, and state transitions — on the background thread.
         </p>
@@ -183,8 +183,8 @@ export function App() {
                 main thread
               </a>{' '}
               for zero-latency input;{' '}
-              <a href="https://lynxjs.org/react" target="_blank" rel="noreferrer">
-                ReactLynx
+              <a href="https://vue.lynxjs.org" target="_blank" rel="noreferrer">
+                Vue Lynx
               </a>{' '}
               manages the UI shell on the background thread.
             </p>

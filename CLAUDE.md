@@ -1,16 +1,23 @@
-# Flappy Bird on Lynx
+# Flappy Bird on Lynx (Vue Lynx)
+
+This project is built with **[Vue Lynx](https://vue.lynxjs.org)** — a Vue 3 custom
+renderer for Lynx. UI is written in Vue Single-File Components (`.vue`) using
+`<script setup>` and the Composition API; the per-frame game loop runs in Main
+Thread Script (MTS). All framework imports come from `vue-lynx` (not `vue` or
+`@lynx-js/react`).
 
 ## Reference
 - `.context/floppybird-main.js` — Game logic and physics constants. READ THIS FIRST.
 - `assets/` — All sprite assets.
+- Vue Lynx docs entry point: <https://vue.lynxjs.org/llms.txt> — read this when working on Vue Lynx tasks.
 
 ## Architecture Rules (MUST FOLLOW)
 
 1. The game loop, touch handling, and ALL per-frame animation MUST run in Main Thread Script (MTS).
-2. React (BTS) is ONLY for: Score display, StartScreen, GameOverPanel, and the game state machine (idle/playing/gameover).
+2. Vue (BTS) is ONLY for: Score display, StartScreen, GameOverPanel, and the game state machine (idle/playing/gameover).
 3. MTS → BTS communication is ONLY for low-frequency events: score updates and game state transitions.
-4. NEVER use setInterval, setTimeout, or requestAnimationFrame in React components to drive the game loop.
-5. NEVER use Redux or any React state manager for per-frame game state (position, velocity, pipe positions).
+4. NEVER use setInterval, setTimeout, or requestAnimationFrame in Vue components/BTS to drive the game loop.
+5. NEVER use Pinia or any Vue/React state manager for per-frame game state (position, velocity, pipe positions).
 6. Collision detection MUST run in MTS, in the same tick as position updates.
 7. Touch events MUST be captured in MTS for zero-latency response.
 
@@ -27,24 +34,37 @@ Phase 1 (static UI) → Phase 2 (game loop) → Phase 3 (animation polish) → P
 
 Adjust for actual screen dimensions and frame rate. Normalize by delta time.
 
-## MTS Patterns in ReactLynx
+## Project Structure (Vue Lynx)
+- `src/index.ts` — entry; `createApp(App).mount()` from `vue-lynx`.
+- `src/App.vue` — root component, renders `<Game />`.
+- `src/Game.vue` — main game. BTS reactive state (`ref` + plain setter functions)
+  and ALL MTS game-loop functions live in its `<script setup>`.
+- `src/*.vue` — UI components (`PipePair`, `ScoreDigits`, `GameOverScreen`, `DevPanel`).
+- `src/useDebugMode.ts`, `src/useStressTest.ts` — composables that own MTS refs + MTS helpers.
+- `src/mts/*.ts` — pure, framework-agnostic MTS modules (`'main thread'` functions taking plain params).
+- `lynx.config.ts` — uses `pluginVueLynx` (with `pluginQRCode`).
+
+## MTS Patterns in Vue Lynx
 - Use `'main thread'` string directive to mark functions as running on main thread
-- Use `main-thread:ref={ref}` for refs accessible on main thread
-- Use `main-thread:bindtouchstart={handler}` for MTS touch events
-- Use `useMainThreadRef` for state that lives on the main thread
-- Use `runOnMainThread()` to execute BTS code on main thread
+- Use `:main-thread-ref="ref"` in templates for refs accessible on main thread
+- Use `:main-thread-bindtouchstart="handler"` for MTS touch events (`:main-thread-bindtap`, etc.)
+- Use `useMainThreadRef` (from `vue-lynx`) for state that lives on the main thread; read/write via `.current`
+- Use `runOnMainThread()` to execute BTS code on main thread; `runOnBackground()` for MTS → BTS
 - Use `requestAnimationFrame` in MTS for the game loop
+- BTS reactive state uses Vue `ref()`; expose a plain setter function (e.g. `function setScore(v){ score.value = v }`)
+  so MTS can call it via `runOnBackground(setScore)(v)`. In `<script setup>` script code, read refs with `.value`;
+  templates auto-unwrap.
 
 ### TDZ (Temporal Dead Zone) in MTS Functions
 
-**Problem:** SWC transforms `function` declarations inside components into `let` bindings, removing JavaScript's normal function hoisting. This means:
+**Problem:** The MTS compiler turns `function` declarations inside `<script setup>` into `let` bindings, removing JavaScript's normal function hoisting. This means:
 
 ```js
 // What you write:
 function a() { b(); }   // ← calls b
 function b() { ... }
 
-// What SWC compiles to:
+// What it compiles to:
 let a = function() { b(); }  // ❌ b is still in TDZ
 let b = function() { ... }
 ```
@@ -72,7 +92,7 @@ If function A calls function B, B **must be declared before A** in source order 
 - **All elements are block-level.** No inline display for `<view>` or `<image>`. See [layout guide](https://lynxjs.org/zh/guide/ui/layout/index.html).
 - **Horizontal image row → use `<text>` not `<view>`.** `<text>` is the only inline-flow container. See [图文混排](https://lynxjs.org/zh/guide/styling/text-and-typography.html#图文混排实现).
 - **`position: absolute` is relative to root**, not nearest positioned ancestor. See [position](https://lynxjs.org/api/css/properties/position.html).
-- **Inline style lengths need units as strings.** `style={{ height: '82px' }}` not `style={{ height: 82 }}`.
+- **Inline style lengths need units as strings.** `:style="{ height: '82px' }"` not `:style="{ height: 82 }"`.
 
 ### Touch/Mouse Events on Web (Observed-Touch Pattern)
 
@@ -89,13 +109,23 @@ On web, we bind **both** `touchstart`/`touchend` and `mousedown`/`mouseup` on th
 ```ts
 const hasTouchRef = useMainThreadRef(false);
 
-function onTouchStart(e) {
+function onTouchStart(e: any) {
   'main thread';
-  const isTouch = !!(e as any).touches;  // TouchEvent has touches, MouseEvent doesn't
+  const isTouch = !!e.touches;  // TouchEvent has touches, MouseEvent doesn't
   if (isTouch) hasTouchRef.current = true;       // Remember: this is a touch device
   else if (hasTouchRef.current) return;           // Mouse on touch device → synthesized, skip
   // ... handle event
 }
+```
+
+Bind both event families in the template:
+```vue
+<view
+  :main-thread-bindtouchstart="onTouchStart"
+  :main-thread-bindtouchend="onTouchEnd"
+  :main-thread-bindmousedown="onTouchStart"
+  :main-thread-bindmouseup="onTouchEnd"
+/>
 ```
 
 - **Self-adapting:** First real touch event teaches the system; desktop never sees touch.
@@ -104,8 +134,8 @@ function onTouchStart(e) {
 - **Long press safe:** `startLongPress` also has its own re-entry guard (timer ref check) as defense-in-depth.
 
 ### runOnBackground (MTS → BTS)
-- MUST be called **inline inside MTS functions**, NOT at the component level
-- Pass stable function references (e.g., React setState setters) directly
-- Correct: `runOnBackground(setScore)(newValue)` inside MTS
-- WRONG: `const fn = runOnBackground(...)` at component level — worklet exec context gets released on re-render, causing "JS function not found" errors
-- For complex BTS updates (e.g., updater functions), track state on MTS side with `useMainThreadRef` and pass the final value
+- MUST be called **inline inside MTS functions**, NOT at the setup/component level
+- Pass stable function references (plain setter functions defined in `<script setup>` that mutate a `ref`) directly
+- Correct: `runOnBackground(setScore)(newValue)` inside MTS, where `function setScore(v){ score.value = v }`
+- WRONG: `const fn = runOnBackground(...)` at setup level — the worklet exec context can be released, causing "JS function not found" errors
+- For complex BTS updates, track state on the MTS side with `useMainThreadRef` and pass the final value
