@@ -903,12 +903,13 @@ onUnmounted(() => {
 <template>
   <view class="game-container" :main-thread-ref="containerRef">
     <view class="game-scaler" :main-thread-ref="scalerRef">
-      <!-- Background -->
+      <!-- Background — the day/night image is owned by MTS (randomizeVariants);
+           no Vue :style binding here, or patchStyle would re-apply the day image
+           on every re-render and the night variant would never survive. -->
       <view class="background" :main-thread-ref="bgRef">
         <view
           class="background-img"
           :main-thread-ref="bgImgRef"
-          :style="{ backgroundImage: `url(${backgroundDay})` }"
         />
       </view>
 
@@ -940,7 +941,7 @@ onUnmounted(() => {
         :key="`sb-${i}`"
         class="shadow-bird"
         :main-thread-ref="shadowRefs[i]"
-        :style="{ display: 'none', left: `${SHADOW_X[i]}px` }"
+        :style="{ left: `${SHADOW_X[i]}px` }"
       >
         <image
           :src="allBirdFrames[Math.floor(i / 2) % 3]![0]"
