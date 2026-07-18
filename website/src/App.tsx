@@ -79,7 +79,7 @@ export function App() {
         </div>
       </div>
       <div className="info-panel">
-        <h1>Lynx Flappy Bird</h1>
+        <h1>Vue Lynx Flappy Bird</h1>
         <p className="desc">
           A cross-platform Flappy Bird vibe-coded with{' '}
           <a href="https://lynxjs.org/" target="_blank" rel="noreferrer">
@@ -119,11 +119,11 @@ export function App() {
         </div>
         <p className="source-link">
           <a
-            href="https://github.com/Huxpro/lynx-flappy-bird"
+            href="https://github.com/Huxpro/lynx-flappy-bird/tree/vue"
             target="_blank"
             rel="noreferrer"
           >
-            View source on GitHub &rarr;
+            View source &middot; vue branch &rarr;
           </a>
         </p>
       </div>
@@ -149,7 +149,7 @@ export function App() {
                 <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
             </button>
-            <h2 className="drawer-title">Lynx Flappy Bird</h2>
+            <h2 className="drawer-title">Vue Lynx Flappy Bird</h2>
             <div className="drawer-qr-card">
               <div ref={modalQrRef} className="qr-canvas" />
               <span className="qr-label">Play natively on mobile</span>
@@ -190,11 +190,11 @@ export function App() {
             </p>
             <a
               className="drawer-source"
-              href="https://github.com/Huxpro/lynx-flappy-bird"
+              href="https://github.com/Huxpro/lynx-flappy-bird/tree/vue"
               target="_blank"
               rel="noreferrer"
             >
-              View source on GitHub &rarr;
+              View source &middot; vue branch &rarr;
             </a>
           </div>
         </div>
