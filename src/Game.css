@@ -39,13 +39,17 @@
   top: 200px;
 }
 
-/* Shadow birds (stress test L1+) — same as .bird but translucent, no fixed left */
+/* Shadow birds (stress test L1+) — same as .bird but translucent, no fixed left.
+   display:none is the default (MTS toggles it via applyStressConfig); it must
+   live in CSS, not a Vue :style binding, or patchStyle would re-hide them on
+   every re-render even while the stress test is showing them. */
 .shadow-bird {
   position: absolute;
   width: 34px;
   height: 24px;
   top: 200px;
   opacity: 0.5;
+  display: none;
 }
 
 .bird-img {
