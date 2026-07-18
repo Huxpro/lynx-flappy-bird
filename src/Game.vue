@@ -270,12 +270,15 @@ function applyLayout(): void {
     }
   }
 
-  // Set dynamic ground height on strips and background offset
+  // Set dynamic ground height on strips and background offset.
+  // MTS owns the ground `left` too (no Vue :style binding on the strips) so that
+  // a BTS re-render on game-state change can't clobber the scrolled positions.
   const gH = layout.groundHeight
   const groundEls = [ground0Ref, ground1Ref, ground2Ref]
   for (let i = 0; i < 3; i++) {
     if (groundEls[i]!.current) {
       groundEls[i]!.current!.setStyleProperty('height', `${gH}px`)
+      groundEls[i]!.current!.setStyleProperty('left', `${groundOffsetRef.current + i * GROUND_WIDTH}px`)
     }
   }
   if (bgImgRef.current) {
@@ -917,14 +920,17 @@ onUnmounted(() => {
         <PipePair :pipe-ref="pipe3Ref" :top-ref="pipe3TopRef" :bot-ref="pipe3BotRef" :gap-ref="gap3Ref" />
       </view>
 
-      <!-- Ground — three independent strips for seamless scrolling -->
-      <view class="ground-strip" :main-thread-ref="ground0Ref" :style="{ left: '0px' }">
+      <!-- Ground — three independent strips for seamless scrolling.
+           `left` is owned entirely by MTS (applyLayout / resetGame / gameTick);
+           no Vue :style binding here, or a BTS re-render would clobber the
+           MTS-scrolled positions and leave part of the row bare. -->
+      <view class="ground-strip" :main-thread-ref="ground0Ref">
         <image :src="base" class="ground-img" />
       </view>
-      <view class="ground-strip" :main-thread-ref="ground1Ref" :style="{ left: `${GROUND_WIDTH}px` }">
+      <view class="ground-strip" :main-thread-ref="ground1Ref">
         <image :src="base" class="ground-img" />
       </view>
-      <view class="ground-strip" :main-thread-ref="ground2Ref" :style="{ left: `${GROUND_WIDTH * 2}px` }">
+      <view class="ground-strip" :main-thread-ref="ground2Ref">
         <image :src="base" class="ground-img" />
       </view>
 

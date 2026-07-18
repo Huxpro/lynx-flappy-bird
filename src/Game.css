@@ -71,26 +71,38 @@
   top: 0;
   overflow: hidden;
   transform: rotate(180deg);
-  background-image: url('../assets/sprites/pipe-body.png');
-  background-size: 52px 2px;
-  background-repeat: repeat-y;
-}
-
-.pipe-top-img {
-  width: 52px;
-  height: 320px;
 }
 
 .pipe-bottom {
   position: absolute;
   width: 52px;
   overflow: hidden;
+}
+
+/* Pipe interior as two sibling layers. Native drops a child <image> that sits
+   over its own parent's background-image (the body tile paints over it), so the
+   parent `.pipe-top`/`.pipe-bottom` carry NO background: instead `.pipe-fill`
+   holds the repeating shaft and the `.pipe-cap-img` <image> (the shaded pipe +
+   lip sprite) is a *sibling* painted on top at the gap end. Both are clipped by
+   the parent's overflow: hidden to the MTS-driven pipe height.
+   `.pipe-fill` uses pipe-body.png (389 B → inlined as a data URI, which the
+   Lynx CSS pipeline resolves); the larger pipe-green.png must come through the
+   JS import as an <image src> — a CSS url() to it resolves to a broken path. */
+.pipe-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 52px;
+  height: 640px;
   background-image: url('../assets/sprites/pipe-body.png');
   background-size: 52px 2px;
   background-repeat: repeat-y;
 }
 
-.pipe-bottom-img {
+.pipe-cap-img {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 52px;
   height: 320px;
 }
